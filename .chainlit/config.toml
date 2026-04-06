@@ -1,0 +1,15 @@
+[project]
+enable_telemetry = false
+name = "TriageAI"
+
+[features]
+prompt_playground = false
+spontaneous_file_upload = true
+
+[UI]
+name = "TriageAI"
+description = "Analysez et priorisez vos feedbacks utilisateurs avec l'IA"
+default_theme = "light"
+
+[meta]
+generated_by = "1.3.0"
