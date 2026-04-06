@@ -76,7 +76,7 @@ IMPORTANT : Retourne UNIQUEMENT ce JSON valide, sans markdown, sans texte autour
 }}"""
 
         response = await self.model.generate_content_async(prompt)
-        return self._parse_json_response(response.text).get("feedbacks", [])
+        return self._parse_json_response(self._extract_text(response)).get("feedbacks", [])
 
     # ------------------------------------------------------------------
     # Étape 2 : Auto-validation réflexive
@@ -119,7 +119,7 @@ Si tout est correct, retourne {{"corrections": []}}
 Ne corrige que ce qui est vraiment erroné. Sois sélectif."""
 
         response = await self.model.generate_content_async(prompt)
-        data = self._parse_json_response(response.text)
+        data = self._parse_json_response(self._extract_text(response))
         corrections = data.get("corrections", [])
 
         # Applique les corrections sur une copie des items
@@ -176,14 +176,40 @@ Génère le rapport avec EXACTEMENT cette structure markdown :
 Sois concis, factuel et orienté décision. Ton de consultant produit senior."""
 
         response = await self.model.generate_content_async(prompt)
-        return response.text
+        return self._extract_text(response)
 
     # ------------------------------------------------------------------
     # Utilitaires
     # ------------------------------------------------------------------
 
+    def _extract_text(self, response) -> str:
+        """
+        Extrait le texte de la réponse Gemini.
+        Compatible avec les modèles 'thinking' (2.5+) où response.text peut être None
+        si toutes les parties sont des tokens de réflexion interne.
+        """
+        # Tentative standard
+        try:
+            text = response.text
+            if text:
+                return text
+        except (ValueError, AttributeError):
+            pass
+
+        # Fallback : extraction manuelle depuis les parts, en excluant les thoughts
+        try:
+            parts = response.candidates[0].content.parts
+            return "".join(
+                p.text for p in parts
+                if hasattr(p, "text") and p.text and not getattr(p, "thought", False)
+            )
+        except Exception:
+            return ""
+
     def _parse_json_response(self, text: str) -> dict:
         """Nettoie et parse la réponse JSON du LLM."""
+        if not text:
+            return {}
         text = text.strip()
         text = re.sub(r"```(?:json)?\s*\n?", "", text)
         text = re.sub(r"\n?```", "", text)
