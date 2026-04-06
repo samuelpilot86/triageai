@@ -1,6 +1,6 @@
 """
-agent.py — Logique de l'agent de triage de feedback produit
-Utilise Google Gemini 1.5 Flash (free tier) pour catégoriser et prioriser les feedbacks.
+agent.py - Logique de l'agent de triage de feedback produit
+Utilise Google Gemini 1.5 Flash (free tier).
 """
 
 import google.generativeai as genai
@@ -9,7 +9,6 @@ import re
 import pandas as pd
 
 
-# Catégories disponibles pour le triage
 CATEGORIES = [
     "Bug / Erreur",
     "Feature Request",
@@ -18,122 +17,92 @@ CATEGORIES = [
     "Pricing / Tarification",
     "Onboarding / Documentation",
     "Support Client",
-    "Sécurité / Confidentialité",
+    "Securite / Confidentialite",
     "Autre",
 ]
 
 
 class FeedbackTriageAgent:
-    """Agent de triage de feedback produit alimenté par Gemini 1.5 Flash."""
 
     def __init__(self, api_key: str):
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel("gemini-1.5-flash")
 
-    # ------------------------------------------------------------------
-    # Étape 1 : Catégorisation & Priorisation
-    # ------------------------------------------------------------------
-
     async def categorize_feedbacks(self, feedbacks: list[str]) -> list[dict]:
-        """
-        Envoie tous les feedbacks en un seul appel LLM et retourne
-        une liste de dicts structurés (catégorie, priorité, sentiment…).
-        """
-        feedbacks_numbered = "\n".join(
-            [f"{i + 1}. {f}" for i, f in enumerate(feedbacks)]
-        )
+        feedbacks_numbered = "\n".join([f"{i+1}. {f}" for i, f in enumerate(feedbacks)])
         categories_str = ", ".join(CATEGORIES)
-
-        prompt = f"""Tu es un expert en analyse de feedback produit. Analyse ces {len(feedbacks)} feedbacks utilisateurs.
+        prompt = f"""Tu es un expert en analyse de feedback produit. Analyse ces {len(feedbacks)} feedbacks.
 
 FEEDBACKS :
 {feedbacks_numbered}
 
-Pour chaque feedback, retourne un objet avec ces champs :
-- id          : numéro du feedback (entier, commence à 1)
-- original    : texte original exact du feedback
-- summary     : résumé synthétique en 6 mots maximum
-- category    : UNE des catégories suivantes : {categories_str}
-- priority    : "Haute", "Moyenne" ou "Faible"
-  * Haute    = impact fort sur la rétention ou l'acquisition, ou problème bloquant
-  * Moyenne  = gêne significative mais contournable
-  * Faible   = amélioration cosmétique ou rare
-- priority_reason : justification de la priorité en 10 mots maximum
-- sentiment   : "Positif", "Neutre" ou "Négatif"
+Pour chaque feedback, retourne un objet JSON avec :
+- id, original, summary (6 mots max), category (parmi: {categories_str}),
+  priority (Haute/Moyenne/Faible), priority_reason (10 mots max), sentiment (Positif/Neutre/Negatif)
 
-IMPORTANT : Retourne UNIQUEMENT ce JSON valide, sans markdown, sans texte autour :
-{{
-  "feedbacks": [
-    {{
-      "id": 1,
-      "original": "...",
-      "summary": "...",
-      "category": "...",
-      "priority": "...",
-      "priority_reason": "...",
-      "sentiment": "..."
-    }}
-  ]
-}}"""
-
+Retourne UNIQUEMENT ce JSON valide :
+{{"feedbacks": [{{"id": 1, "original": "...", "summary": "...", "category": "...", "priority": "...", "priority_reason": "...", "sentiment": "..."}}]}}"""
         response = await self.model.generate_content_async(prompt)
         return self._parse_json_response(response.text).get("feedbacks", [])
 
-    # ------------------------------------------------------------------
-    # Étape 2 : Rapport exécutif
-    # ------------------------------------------------------------------
+    async def validate_and_correct(self, items: list[dict]) -> tuple[list[dict], list[dict]]:
+        """
+        COMPORTEMENT AGENTIQUE : l'agent relit ses propres decisions et se corrige.
+        Boucle de feedback reflexive = ce qui distingue un agent d'un simple pipeline LLM.
+        """
+        items_json = json.dumps(items, ensure_ascii=False, indent=2)
+        categories_str = ", ".join(CATEGORIES)
+        prompt = f"""Tu es un expert en analyse de feedback produit. Audite tes propres categorisations.
+
+CATEGORISATIONS A AUDITER :
+{items_json}
+
+Identifie les erreurs :
+- Categorie incorrecte parmi : {categories_str} ?
+- Priorite incohérente avec l'impact produit ?
+- Sentiment ne reflétant pas le texte ?
+
+Retourne UNIQUEMENT ce JSON valide :
+{{"corrections": [{{"id": 1, "field": "category|priority|sentiment", "old_value": "...", "new_value": "...", "reason": "..."}}]}}
+Si tout est correct : {{"corrections": []}}
+Sois selectif, ne corrige que les vraies erreurs."""
+        response = await self.model.generate_content_async(prompt)
+        data = self._parse_json_response(response.text)
+        corrections = data.get("corrections", [])
+        corrected_items = [dict(item) for item in items]
+        for correction in corrections:
+            for item in corrected_items:
+                if item.get("id") == correction.get("id"):
+                    item[correction["field"]] = correction["new_value"]
+                    break
+        return corrected_items, corrections
 
     async def generate_report(self, items: list[dict]) -> str:
-        """
-        Génère un rapport exécutif PM à partir des feedbacks catégorisés.
-        """
         df = pd.DataFrame(items)
-
         category_stats = df["category"].value_counts().to_dict()
         priority_stats = df["priority"].value_counts().to_dict()
         sentiment_stats = df["sentiment"].value_counts().to_dict()
+        high_priority = df[df["priority"] == "Haute"][["summary", "category"]].head(5).to_dict("records")
+        prompt = f"""Tu es un Product Manager senior. Rapport executif sur {len(items)} feedbacks.
 
-        high_priority = (
-            df[df["priority"] == "Haute"][["summary", "category"]]
-            .head(5)
-            .to_dict("records")
-        )
+Stats : categories={json.dumps(category_stats, ensure_ascii=False)}, priorites={json.dumps(priority_stats, ensure_ascii=False)}, sentiments={json.dumps(sentiment_stats, ensure_ascii=False)}
+Haute priorite : {json.dumps(high_priority, ensure_ascii=False)}
 
-        prompt = f"""Tu es un Product Manager senior. Génère un rapport exécutif basé sur cette analyse de {len(items)} feedbacks utilisateurs.
+## Synthese
+[2-3 phrases etat general]
 
-STATISTIQUES :
-- Par catégorie : {json.dumps(category_stats, ensure_ascii=False)}
-- Par priorité  : {json.dumps(priority_stats, ensure_ascii=False)}
-- Par sentiment : {json.dumps(sentiment_stats, ensure_ascii=False)}
-- Feedbacks haute priorité : {json.dumps(high_priority, ensure_ascii=False)}
+## Top 3 des actions recommandees
+1. **[Action]** - [Justification]
+2. **[Action]** - [Justification]
+3. **[Action]** - [Justification]
 
-Génère le rapport avec EXACTEMENT cette structure markdown :
-
-## Synthèse
-[2-3 phrases sur l'état général du produit perçu par les utilisateurs. Mentionne le ratio sentiment et la catégorie dominante.]
-
-## Top 3 des actions recommandées
-1. **[Action]** — [Justification courte orientée impact produit]
-2. **[Action]** — [Justification courte orientée impact produit]
-3. **[Action]** — [Justification courte orientée impact produit]
-
-## Signal faible à surveiller
-[1 insight non évident, tendance émergente ou risque sous-estimé à investiguer davantage]
-
-Sois concis, factuel et orienté décision. Ton de consultant produit senior."""
-
+## Signal faible a surveiller
+[1 insight non evident]"""
         response = await self.model.generate_content_async(prompt)
         return response.text
 
-    # ------------------------------------------------------------------
-    # Utilitaires
-    # ------------------------------------------------------------------
-
     def _parse_json_response(self, text: str) -> dict:
-        """Nettoie et parse la réponse JSON du LLM."""
         text = text.strip()
-        # Supprime les blocs de code markdown si présents
         text = re.sub(r"```(?:json)?\s*\n?", "", text)
         text = re.sub(r"\n?```", "", text)
-        text = text.strip()
-        return json.loads(text)
+        return json.loads(text.strip())
