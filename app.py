@@ -110,20 +110,25 @@ async def _run_pipeline(feedbacks: list[str], agent: FeedbackTriageAgent) -> Non
     """Exécute les 4 étapes de l'agent sur une liste de feedbacks."""
 
     async with cl.Step(name="📥 Lecture des feedbacks", type="tool") as step:
+        step.input = f"{len(feedbacks)} feedbacks reçus."
         step.output = f"**{len(feedbacks)} feedbacks** reçus et prêts à l'analyse."
 
     items: list[dict] = []
+    categorization_error = None
     async with cl.Step(name="🏷️ Catégorisation & Priorisation", type="llm") as step:
-        step.input = f"Analyse de {len(feedbacks)} feedbacks avec Gemini 1.5 Flash…"
+        step.input = f"Analyse de {len(feedbacks)} feedbacks avec Gemini…"
         try:
             items = await agent.categorize_feedbacks(feedbacks)
             step.output = f"✅ {len(items)} feedbacks catégorisés avec succès."
         except Exception as e:
-            step.output = f"❌ Erreur : {str(e)}"
-            await cl.Message(
-                content=f"❌ **Erreur lors de la catégorisation**\n\n`{str(e)}`"
-            ).send()
-            return
+            categorization_error = str(e)
+            step.output = f"❌ Erreur : {categorization_error}"
+
+    if categorization_error:
+        await cl.Message(
+            content=f"❌ **Erreur lors de la catégorisation**\n\n`{categorization_error}`"
+        ).send()
+        return
 
     corrections = []
     async with cl.Step(name="🔍 Auto-validation & Corrections", type="tool") as step:
@@ -150,13 +155,15 @@ async def _run_pipeline(feedbacks: list[str], agent: FeedbackTriageAgent) -> Non
             step.output = f"⚠️ Auto-validation ignorée : {str(e)}"
 
     report = ""
+    report_error = None
     async with cl.Step(name="📊 Génération du rapport exécutif", type="llm") as step:
         step.input = "Rédaction du rapport PM…"
         try:
             report = await agent.generate_report(items)
             step.output = "✅ Rapport généré."
         except Exception as e:
-            step.output = f"❌ Erreur rapport : {str(e)}"
+            report_error = str(e)
+            step.output = f"❌ Erreur rapport : {report_error}"
 
     # Tableau détaillé
     if items:
