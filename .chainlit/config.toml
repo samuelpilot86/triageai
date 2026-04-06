@@ -4,7 +4,6 @@ name = "TriageAI"
 
 [features]
 prompt_playground = false
-spontaneous_file_upload = true
 
 [UI]
 name = "TriageAI"
