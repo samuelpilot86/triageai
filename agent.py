@@ -27,7 +27,7 @@ class FeedbackTriageAgent:
 
     def __init__(self, api_key: str):
         self.client = genai.Client(api_key=api_key)
-        self.model = "gemini-2.5-flash"
+        self.model = "gemini-2.5-flash-lite"
 
     # ------------------------------------------------------------------
     # Étape 1 : Catégorisation & Priorisation
