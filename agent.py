@@ -1,12 +1,12 @@
 """
 agent.py — Logique de l'agent de triage de feedback produit
-Utilise Google Gemini 1.5 Flash (free tier) pour catégoriser et prioriser les feedbacks.
+Utilise Google Gemini 2.5 Flash via le SDK officiel google-genai.
 """
 
-import google.generativeai as genai
 import json
 import re
 import pandas as pd
+from google import genai
 
 
 CATEGORIES = [
@@ -23,11 +23,11 @@ CATEGORIES = [
 
 
 class FeedbackTriageAgent:
-    """Agent de triage de feedback produit alimenté par Gemini 1.5 Flash."""
+    """Agent de triage de feedback produit alimenté par Gemini 2.5 Flash."""
 
     def __init__(self, api_key: str):
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel("gemini-2.5-flash")
+        self.client = genai.Client(api_key=api_key)
+        self.model = "gemini-2.5-flash"
 
     # ------------------------------------------------------------------
     # Étape 1 : Catégorisation & Priorisation
@@ -75,7 +75,10 @@ IMPORTANT : Retourne UNIQUEMENT ce JSON valide, sans markdown, sans texte autour
   ]
 }}"""
 
-        response = await self.model.generate_content_async(prompt)
+        response = await self.client.aio.models.generate_content(
+            model=self.model,
+            contents=prompt,
+        )
         return self._parse_json_response(self._extract_text(response)).get("feedbacks", [])
 
     # ------------------------------------------------------------------
@@ -85,7 +88,6 @@ IMPORTANT : Retourne UNIQUEMENT ce JSON valide, sans markdown, sans texte autour
     async def validate_and_correct(self, items: list[dict]) -> tuple[list[dict], list[dict]]:
         """
         L'agent relit ses propres catégorisations et se corrige si nécessaire.
-        C'est le comportement agentique clé : boucle de feedback sur soi-même.
         Retourne (items_corrigés, liste_des_corrections).
         """
         items_json = json.dumps(items, ensure_ascii=False, indent=2)
@@ -118,11 +120,13 @@ Retourne UNIQUEMENT ce JSON valide, sans markdown :
 Si tout est correct, retourne {{"corrections": []}}
 Ne corrige que ce qui est vraiment erroné. Sois sélectif."""
 
-        response = await self.model.generate_content_async(prompt)
+        response = await self.client.aio.models.generate_content(
+            model=self.model,
+            contents=prompt,
+        )
         data = self._parse_json_response(self._extract_text(response))
         corrections = data.get("corrections", [])
 
-        # Applique les corrections sur une copie des items
         corrected_items = [dict(item) for item in items]
         for correction in corrections:
             for item in corrected_items:
@@ -137,9 +141,7 @@ Ne corrige que ce qui est vraiment erroné. Sois sélectif."""
     # ------------------------------------------------------------------
 
     async def generate_report(self, items: list[dict]) -> str:
-        """
-        Génère un rapport exécutif PM à partir des feedbacks catégorisés.
-        """
+        """Génère un rapport exécutif PM à partir des feedbacks catégorisés."""
         df = pd.DataFrame(items)
 
         category_stats = df["category"].value_counts().to_dict()
@@ -163,7 +165,7 @@ STATISTIQUES :
 Génère le rapport avec EXACTEMENT cette structure markdown :
 
 ## Synthèse
-[2-3 phrases sur l'état général du produit perçu par les utilisateurs. Mentionne le ratio sentiment et la catégorie dominante.]
+[2-3 phrases sur l'état général du produit perçu par les utilisateurs.]
 
 ## Top 3 des actions recommandées
 1. **[Action]** — [Justification courte orientée impact produit]
@@ -171,11 +173,14 @@ Génère le rapport avec EXACTEMENT cette structure markdown :
 3. **[Action]** — [Justification courte orientée impact produit]
 
 ## Signal faible à surveiller
-[1 insight non évident, tendance émergente ou risque sous-estimé à investiguer davantage]
+[1 insight non évident ou tendance émergente à investiguer]
 
 Sois concis, factuel et orienté décision. Ton de consultant produit senior."""
 
-        response = await self.model.generate_content_async(prompt)
+        response = await self.client.aio.models.generate_content(
+            model=self.model,
+            contents=prompt,
+        )
         return self._extract_text(response)
 
     # ------------------------------------------------------------------
@@ -183,20 +188,13 @@ Sois concis, factuel et orienté décision. Ton de consultant produit senior."""
     # ------------------------------------------------------------------
 
     def _extract_text(self, response) -> str:
-        """
-        Extrait le texte de la réponse Gemini.
-        Compatible avec les modèles 'thinking' (2.5+) où response.text peut être None
-        si toutes les parties sont des tokens de réflexion interne.
-        """
-        # Tentative standard
+        """Extrait le texte de la réponse, compatible avec les modèles thinking."""
         try:
             text = response.text
             if text:
                 return text
         except (ValueError, AttributeError):
             pass
-
-        # Fallback : extraction manuelle depuis les parts, en excluant les thoughts
         try:
             parts = response.candidates[0].content.parts
             return "".join(
