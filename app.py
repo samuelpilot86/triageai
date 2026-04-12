@@ -109,20 +109,26 @@ async def on_chat_start():
 async def _run_pipeline(feedbacks: list[str], agent: FeedbackTriageAgent) -> None:
     """Exécute les 4 étapes de l'agent sur une liste de feedbacks."""
 
-    async with cl.Step(name="📥 Lecture des feedbacks", type="tool") as step:
-        step.input = f"{len(feedbacks)} feedbacks reçus."
-        step.output = f"**{len(feedbacks)} feedbacks** reçus et prêts à l'analyse."
+    # Step 1 — Lecture
+    step1 = cl.Step(name="📥 Lecture des feedbacks", type="tool")
+    step1.input = f"{len(feedbacks)} feedbacks reçus."
+    step1.output = f"**{len(feedbacks)} feedbacks** reçus et prêts à l'analyse."
+    await step1.send()
 
+    # Step 2 — Catégorisation
     items: list[dict] = []
     categorization_error = None
-    async with cl.Step(name="🏷️ Catégorisation & Priorisation", type="llm") as step:
-        step.input = f"Analyse de {len(feedbacks)} feedbacks avec Gemini…"
-        try:
-            items = await agent.categorize_feedbacks(feedbacks)
-            step.output = f"✅ {len(items)} feedbacks catégorisés avec succès."
-        except Exception as e:
-            categorization_error = str(e)
-            step.output = f"❌ Erreur : {categorization_error}"
+    step2 = cl.Step(name="🏷️ Catégorisation & Priorisation", type="llm")
+    step2.input = f"Analyse de {len(feedbacks)} feedbacks avec Gemini…"
+    step2.output = "⏳ En cours…"
+    await step2.send()
+    try:
+        items = await agent.categorize_feedbacks(feedbacks)
+        step2.output = f"✅ {len(items)} feedbacks catégorisés avec succès."
+    except Exception as e:
+        categorization_error = str(e)
+        step2.output = f"❌ Erreur : {categorization_error}"
+    await step2.update()
 
     if categorization_error:
         await cl.Message(
@@ -130,40 +136,48 @@ async def _run_pipeline(feedbacks: list[str], agent: FeedbackTriageAgent) -> Non
         ).send()
         return
 
+    # Step 3 — Auto-validation
     corrections = []
-    async with cl.Step(name="🔍 Auto-validation & Corrections", type="tool") as step:
-        step.input = "L'agent relit ses propres catégorisations…"
-        try:
-            items, corrections = await agent.validate_and_correct(items)
-            if corrections:
-                lines = [f"**{len(corrections)} correction(s) effectuée(s) :**"]
-                for c in corrections:
-                    field_label = {
-                        "category": "catégorie",
-                        "priority": "priorité",
-                        "sentiment": "sentiment",
-                    }.get(c.get("field", ""), c.get("field", ""))
-                    lines.append(
-                        f"- Feedback #{c.get('id')} — {field_label} : "
-                        f"`{c.get('old_value')}` → **{c.get('new_value')}** "
-                        f"*({c.get('reason', '')})*"
-                    )
-                step.output = "\n".join(lines)
-            else:
-                step.output = "✅ Aucune correction nécessaire — catégorisations validées."
-        except Exception as e:
-            step.output = f"⚠️ Auto-validation ignorée : {str(e)}"
+    step3 = cl.Step(name="🔍 Auto-validation & Corrections", type="tool")
+    step3.input = "L'agent relit ses propres catégorisations…"
+    step3.output = "⏳ En cours…"
+    await step3.send()
+    try:
+        items, corrections = await agent.validate_and_correct(items)
+        if corrections:
+            lines = [f"**{len(corrections)} correction(s) effectuée(s) :**"]
+            for c in corrections:
+                field_label = {
+                    "category": "catégorie",
+                    "priority": "priorité",
+                    "sentiment": "sentiment",
+                }.get(c.get("field", ""), c.get("field", ""))
+                lines.append(
+                    f"- Feedback #{c.get('id')} — {field_label} : "
+                    f"`{c.get('old_value')}` → **{c.get('new_value')}** "
+                    f"*({c.get('reason', '')})*"
+                )
+            step3.output = "\n".join(lines)
+        else:
+            step3.output = "✅ Aucune correction nécessaire — catégorisations validées."
+    except Exception as e:
+        step3.output = f"⚠️ Auto-validation ignorée : {str(e)}"
+    await step3.update()
 
+    # Step 4 — Rapport
     report = ""
     report_error = None
-    async with cl.Step(name="📊 Génération du rapport exécutif", type="llm") as step:
-        step.input = "Rédaction du rapport PM…"
-        try:
-            report = await agent.generate_report(items)
-            step.output = "✅ Rapport généré."
-        except Exception as e:
-            report_error = str(e)
-            step.output = f"❌ Erreur rapport : {report_error}"
+    step4 = cl.Step(name="📊 Génération du rapport exécutif", type="llm")
+    step4.input = "Rédaction du rapport PM…"
+    step4.output = "⏳ En cours…"
+    await step4.send()
+    try:
+        report = await agent.generate_report(items)
+        step4.output = "✅ Rapport généré."
+    except Exception as e:
+        report_error = str(e)
+        step4.output = f"❌ Erreur rapport : {report_error}"
+    await step4.update()
 
     # Tableau détaillé
     if items:
@@ -280,20 +294,21 @@ async def on_message(message: cl.Message):
 
         feedbacks: list[str] = []
         source = ""
-        async with cl.Step(
-            name=f"🌐 Récupération des avis — {app['name']}", type="tool"
-        ) as step:
-            step.input = f"Scraping {app['name']} ({app['category']})…"
-            try:
-                feedbacks, source = await fetch_reviews(app, count=50)
-                if feedbacks:
-                    step.output = (
-                        f"✅ **{len(feedbacks)} avis récupérés** depuis **{source}**."
-                    )
-                else:
-                    step.output = "❌ Aucun avis récupéré (sources indisponibles)."
-            except Exception as e:
-                step.output = f"❌ Erreur : {str(e)}"
+        step_scrape = cl.Step(name=f"🌐 Récupération des avis — {app['name']}", type="tool")
+        step_scrape.input = f"Scraping {app['name']} ({app['category']})…"
+        step_scrape.output = "⏳ En cours…"
+        await step_scrape.send()
+        try:
+            feedbacks, source = await fetch_reviews(app, count=50)
+            if feedbacks:
+                step_scrape.output = (
+                    f"✅ **{len(feedbacks)} avis récupérés** depuis **{source}**."
+                )
+            else:
+                step_scrape.output = "❌ Aucun avis récupéré (sources indisponibles)."
+        except Exception as e:
+            step_scrape.output = f"❌ Erreur : {str(e)}"
+        await step_scrape.update()
 
         if not feedbacks:
             await cl.Message(
