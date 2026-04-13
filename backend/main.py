@@ -16,10 +16,12 @@ import pandas as pd
 
 from agent import FeedbackTriageAgent
 from scraper import (
-    APP_CATALOG,
-    fetch_reviews,
+    APP_STORE_CATEGORIES,
+    GOOGLE_PLAY_CATEGORIES,
     fetch_play_store_reviews,
     fetch_app_store_reviews,
+    fetch_appstore_top_apps,
+    fetch_googleplay_top_apps,
 )
 
 # ------------------------------------------------------------------
@@ -150,10 +152,10 @@ async def analyze_store(body: dict):
         yield sse_event("status", {"step": "scraping", "message": f"Fetching reviews for {app_entry['name']}…"})
         try:
             if store == "googleplay":
-                feedbacks = await fetch_play_store_reviews(app_entry["play_id"], count=50)
+                feedbacks = await fetch_play_store_reviews(app_entry["id"], count=50)
                 source = "Google Play"
             else:
-                feedbacks = await fetch_app_store_reviews(app_entry["ios_id"], count=50)
+                feedbacks = await fetch_app_store_reviews(app_entry["id"], count=50)
                 source = "App Store"
         except Exception as e:
             yield sse_event("error", {"message": f"Scraping failed: {str(e)}"})
@@ -175,30 +177,23 @@ async def analyze_store(body: dict):
 # Store catalog endpoints
 # ------------------------------------------------------------------
 
-# Category lists derived from catalog
-_GP_CATEGORIES = sorted({a["category"] for a in APP_CATALOG if a.get("play_id")})
-_AS_CATEGORIES = sorted({a["category"] for a in APP_CATALOG if a.get("ios_id")})
-
-
 @app.get("/api/store/categories")
 async def get_categories(store: str = Query("googleplay")):
     """Returns available categories for the selected store."""
-    return {"categories": _GP_CATEGORIES if store == "googleplay" else _AS_CATEGORIES}
+    if store == "googleplay":
+        return {"categories": sorted(GOOGLE_PLAY_CATEGORIES)}
+    else:
+        return {"categories": sorted(APP_STORE_CATEGORIES.keys())}
 
 
 @app.get("/api/store/apps")
 async def get_apps(store: str = Query("googleplay"), category: str = Query(...)):
-    """Returns apps in the catalog for a given store + category."""
-    results = []
-    for a in APP_CATALOG:
-        if a["category"] != category:
-            continue
-        if store == "googleplay" and not a.get("play_id"):
-            continue
-        if store == "appstore" and not a.get("ios_id"):
-            continue
-        results.append({"id": a["id"], "name": a["name"], "category": a["category"]})
-    return {"apps": results}
+    """Returns top 10 apps for a given store + category (live, cached 24h)."""
+    if store == "googleplay":
+        apps = await fetch_googleplay_top_apps(category, count=10)
+    else:
+        apps = await fetch_appstore_top_apps(category, count=10)
+    return {"apps": apps}
 
 
 @app.get("/api/health")
