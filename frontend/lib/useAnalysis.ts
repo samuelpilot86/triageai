@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { AnalysisStep, AnalysisResult, FeedbackItem, Correction, Store, AppEntry } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7860";
@@ -56,10 +56,14 @@ function streamEvents(
 export function useAnalysis() {
   const [step, setStep] = useState<AnalysisStep>({ type: "idle" });
   const [partialItems, setPartialItems] = useState<FeedbackItem[]>([]);
+  const correctionsRef = useRef<Correction[]>([]);
+  const usedFallbackRef = useRef<boolean>(false);
 
   const reset = useCallback(() => {
     setStep({ type: "idle" });
     setPartialItems([]);
+    correctionsRef.current = [];
+    usedFallbackRef.current = false;
   }, []);
 
   const handleEvents = useCallback((event: string, data: unknown) => {
@@ -69,15 +73,18 @@ export function useAnalysis() {
       if (s === "scraping") setStep({ type: "scraping" });
       else if (s === "categorization") setStep({ type: "categorization" });
       else if (s === "report") setStep({ type: "report" });
+    } else if (event === "scraped") {
+      setStep({ type: "categorization" });
     } else if (event === "categorization") {
       setPartialItems(d.items as FeedbackItem[]);
+      correctionsRef.current = (d.corrections as Correction[]) ?? [];
+      usedFallbackRef.current = (d.used_fallback as boolean) ?? false;
     } else if (event === "report") {
       setPartialItems((items) => {
-        // finalize with report
         const result: AnalysisResult = {
           items,
-          corrections: [] as Correction[],
-          used_fallback: false,
+          corrections: correctionsRef.current,
+          used_fallback: usedFallbackRef.current,
           report: d.text as string,
           report_fallback: d.used_fallback as boolean,
         };
