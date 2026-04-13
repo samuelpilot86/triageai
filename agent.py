@@ -1,12 +1,14 @@
 """
 agent.py — Core logic of the product feedback triage agent.
-Uses Google Gemini 2.5 Flash via the official google-genai SDK.
+Uses Google Gemini 2.5 Flash as primary model, with Groq (Llama 3.3 70B)
+as automatic fallback when the Gemini free-tier quota is exhausted.
 """
 
 import json
 import re
 import pandas as pd
 from google import genai
+from groq import AsyncGroq
 
 
 CATEGORIES = [
@@ -21,13 +23,59 @@ CATEGORIES = [
     "Other",
 ]
 
+PRIMARY_MODEL = "gemini-2.5-flash-lite"
+FALLBACK_MODEL = "llama-3.3-70b-versatile"
+
 
 class FeedbackTriageAgent:
-    """Product feedback triage agent powered by Gemini 2.5 Flash."""
+    """
+    Product feedback triage agent powered by Gemini 2.5 Flash.
+    Automatically falls back to Groq (Llama 3.3 70B) on quota exhaustion.
+    """
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, groq_api_key: str | None = None):
         self.client = genai.Client(api_key=api_key)
-        self.model = "gemini-2.5-flash-lite"
+        self.groq_client = AsyncGroq(api_key=groq_api_key) if groq_api_key else None
+
+    # ------------------------------------------------------------------
+    # Central LLM call with fallback
+    # ------------------------------------------------------------------
+
+    async def _call_llm(self, prompt: str) -> tuple[str, bool]:
+        """
+        Calls the primary model (Gemini). If quota is exhausted (429),
+        falls back to Groq automatically.
+        Returns (response_text, used_fallback).
+        Raises if both models fail or Groq is not configured.
+        """
+        # Try Gemini first
+        try:
+            response = await self.client.aio.models.generate_content(
+                model=PRIMARY_MODEL,
+                contents=prompt,
+            )
+            return self._extract_text(response), False
+
+        except Exception as e:
+            error_str = str(e)
+            is_quota = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str
+
+            if not is_quota:
+                raise  # Non-quota error: propagate immediately
+
+            # Quota exhausted — try Groq fallback
+            if not self.groq_client:
+                raise RuntimeError(
+                    "Gemini quota exhausted and no GROQ_API_KEY configured. "
+                    "Please set GROQ_API_KEY in your Space secrets to enable fallback."
+                ) from e
+
+            response = await self.groq_client.chat.completions.create(
+                model=FALLBACK_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+            )
+            return response.choices[0].message.content, True
 
     # ------------------------------------------------------------------
     # Step 1: Categorization + Self-validation (single LLM call)
@@ -35,10 +83,10 @@ class FeedbackTriageAgent:
 
     async def categorize_and_validate(
         self, feedbacks: list[str]
-    ) -> tuple[list[dict], list[dict]]:
+    ) -> tuple[list[dict], list[dict], bool]:
         """
         Categorizes feedbacks AND self-corrects in a single LLM call.
-        Returns (final_items, corrections_list).
+        Returns (final_items, corrections_list, used_fallback).
         """
         feedbacks_numbered = "\n".join(
             [f"{i + 1}. {f}" for i, f in enumerate(feedbacks)]
@@ -98,19 +146,19 @@ Return ONLY valid JSON, no markdown, no surrounding text:
 If no corrections are needed, return "corrections": [].
 Be selective: only flag genuinely justified corrections."""
 
-        response = await self.client.aio.models.generate_content(
-            model=self.model,
-            contents=prompt,
-        )
-        data = self._parse_json_response(self._extract_text(response))
-        return data.get("feedbacks", []), data.get("corrections", [])
+        text, used_fallback = await self._call_llm(prompt)
+        data = self._parse_json_response(text)
+        return data.get("feedbacks", []), data.get("corrections", []), used_fallback
 
     # ------------------------------------------------------------------
     # Step 2: Executive report
     # ------------------------------------------------------------------
 
-    async def generate_report(self, items: list[dict]) -> str:
-        """Generates a PM executive report from the categorized feedbacks."""
+    async def generate_report(self, items: list[dict]) -> tuple[str, bool]:
+        """
+        Generates a PM executive report from the categorized feedbacks.
+        Returns (report_text, used_fallback).
+        """
         df = pd.DataFrame(items)
 
         category_stats = df["category"].value_counts().to_dict()
@@ -146,11 +194,8 @@ Generate the report using EXACTLY this markdown structure:
 
 Be concise, factual and decision-oriented. Tone of a senior product consultant."""
 
-        response = await self.client.aio.models.generate_content(
-            model=self.model,
-            contents=prompt,
-        )
-        return self._extract_text(response)
+        text, used_fallback = await self._call_llm(prompt)
+        return text, used_fallback
 
     # ------------------------------------------------------------------
     # Utilities

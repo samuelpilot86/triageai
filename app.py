@@ -65,6 +65,7 @@ Type `apps` to browse the catalog of 15 apps and automatically fetch their lates
 - 🔥 **Prioritizes** with justification (High / Medium / Low)
 - 😊 **Analyzes sentiment** (Positive / Neutral / Negative)
 - 🔍 **Self-corrects** — reviews its own decisions and revises them if needed
+- 🔄 **Auto-fallback** — switches to Llama 3.3 70B (Groq) if Gemini quota is reached
 - 📊 **Generates an executive report** with Top 3 recommendations
 - 💾 **CSV export** of results available for download
 
@@ -94,7 +95,8 @@ async def on_chat_start():
         ).send()
         return
 
-    agent = FeedbackTriageAgent(api_key=api_key)
+    groq_api_key = os.environ.get("GROQ_API_KEY")
+    agent = FeedbackTriageAgent(api_key=api_key, groq_api_key=groq_api_key)
     cl.user_session.set("agent", agent)
     cl.user_session.set("mode", None)
 
@@ -123,9 +125,15 @@ async def _run_pipeline(feedbacks: list[str], agent: FeedbackTriageAgent) -> Non
     step2.input = f"Analyzing + self-correcting {len(feedbacks)} feedbacks with Gemini…"
     step2.output = "⏳ In progress…"
     await step2.send()
+    used_fallback = False
     try:
-        items, corrections = await agent.categorize_and_validate(feedbacks)
+        items, corrections, used_fallback = await agent.categorize_and_validate(feedbacks)
         lines = [f"✅ {len(items)} feedbacks categorized and validated."]
+        if used_fallback:
+            lines.append(
+                f"⚠️ *Gemini quota reached — analysis performed by **Llama 3.3 70B** (Groq). "
+                f"Results may vary slightly.*"
+            )
         if corrections:
             lines.append(f"🔍 **{len(corrections)} auto-correction(s) applied:**")
             for c in corrections:
@@ -161,8 +169,11 @@ async def _run_pipeline(feedbacks: list[str], agent: FeedbackTriageAgent) -> Non
     step4.output = "⏳ In progress…"
     await step4.send()
     try:
-        report = await agent.generate_report(items)
-        step4.output = "✅ Report generated."
+        report, report_fallback = await agent.generate_report(items)
+        note = (
+            " *(Llama 3.3 70B — Groq fallback)*" if report_fallback else ""
+        )
+        step4.output = f"✅ Report generated.{note}"
     except Exception as e:
         report_error = str(e)
         step4.output = f"❌ Report error: {report_error}"
