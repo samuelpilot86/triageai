@@ -182,12 +182,12 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
               <label className="block text-xs font-medium text-gray-500 mb-1">Application</label>
               <div className="relative">
                 <select
-                  value={selectedApp?.id ?? ""}
-                  onChange={(e) => setSelectedApp(apps.find((a) => a.id === +e.target.value) ?? null)}
+                  value={selectedApp ? String(selectedApp.id) : ""}
+                  onChange={(e) => setSelectedApp(apps.find((a) => String(a.id) === e.target.value) ?? null)}
                   className="w-full appearance-none px-3 py-2 pr-8 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="">Select an app…</option>
-                  {apps.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  {apps.map((a) => <option key={String(a.id)} value={String(a.id)}>{a.name}</option>)}
                 </select>
                 <ChevronDown className="absolute right-2 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" />
               </div>
