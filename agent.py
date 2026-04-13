@@ -178,34 +178,46 @@ Be selective: only flag genuinely justified corrections."""
         priority_stats = df["priority"].value_counts().to_dict()
         sentiment_stats = df["sentiment"].value_counts().to_dict()
 
-        high_priority = (
-            df[df["priority"] == "High"][["summary", "category"]]
-            .head(5)
-            .to_dict("records")
-        )
+        # Group recurring issues by summary within each category, with frequency
+        issue_clusters = []
+        for cat, group in df[df["priority"].isin(["High", "Medium"])].groupby("category"):
+            freq = group["summary"].value_counts()
+            top_issues = [
+                {"issue": issue, "count": int(count), "priority": "High" if any(
+                    group[group["summary"] == issue]["priority"] == "High"
+                ) else "Medium"}
+                for issue, count in freq.head(4).items()
+            ]
+            issue_clusters.append({"category": cat, "total": len(group), "top_issues": top_issues})
+        issue_clusters.sort(key=lambda x: x["total"], reverse=True)
 
         prompt = f"""You are a senior Product Manager. Generate an executive report based on this analysis of {len(items)} user feedbacks.
 
-STATISTICS:
-- By category : {json.dumps(category_stats, ensure_ascii=False)}
-- By priority : {json.dumps(priority_stats, ensure_ascii=False)}
-- By sentiment: {json.dumps(sentiment_stats, ensure_ascii=False)}
-- High-priority feedbacks: {json.dumps(high_priority, ensure_ascii=False)}
+OVERVIEW:
+- Sentiment: {json.dumps(sentiment_stats, ensure_ascii=False)}
+- By priority: {json.dumps(priority_stats, ensure_ascii=False)}
+
+ISSUE BREAKDOWN (High + Medium priority, grouped by theme):
+{json.dumps(issue_clusters, ensure_ascii=False, indent=2)}
 
 Generate the report using EXACTLY this markdown structure:
 
 ## Summary
-[2-3 sentences on the overall product perception from users.]
+[2-3 sentences on the overall product health, referencing the dominant issue themes specifically.]
 
 ## Top 3 Recommended Actions
-1. **[Action]** — [Short impact-oriented justification]
-2. **[Action]** — [Short impact-oriented justification]
-3. **[Action]** — [Short impact-oriented justification]
+1. **[Specific action targeting the most frequent issue]** — [Justification with numbers: how many users affected, expected impact]
+2. **[Specific action targeting the 2nd issue cluster]** — [Justification with numbers]
+3. **[Specific action targeting the 3rd issue cluster]** — [Justification with numbers]
 
 ## Weak Signal to Watch
-[1 non-obvious insight or emerging trend worth investigating]
+[1 non-obvious insight — a low-frequency issue that could become critical, or an unexpected pattern in the data]
 
-Be concise, factual and decision-oriented. Tone of a senior product consultant."""
+Rules:
+- Name the actual issues (e.g. "fix filter search bug" not "fix bugs")
+- Include counts/percentages to justify prioritization
+- Each action must be specific enough to go directly into a sprint backlog
+- Tone: senior product consultant, concise, decision-oriented"""
 
         # Report output is always short (~800-1200 tokens), regardless of input size
         text, used_fallback = await self._call_llm(prompt, max_tokens=2048)
