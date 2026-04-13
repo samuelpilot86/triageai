@@ -25,6 +25,12 @@ CATEGORIES = [
 
 PRIMARY_MODEL = "gemini-2.5-flash-lite"
 FALLBACK_MODEL = "llama-3.3-70b-versatile"
+FALLBACK_MODEL_MAX_TOKENS = 32_768  # llama-3.3-70b-versatile hard limit
+
+# Output token budget per feedback (JSON fields: original, summary, category,
+# priority, priority_reason, sentiment + corrections) + fixed overhead
+_TOKENS_PER_FEEDBACK = 250
+_TOKENS_OVERHEAD = 512
 
 
 class FeedbackTriageAgent:
@@ -41,7 +47,7 @@ class FeedbackTriageAgent:
     # Central LLM call with fallback
     # ------------------------------------------------------------------
 
-    async def _call_llm(self, prompt: str) -> tuple[str, bool]:
+    async def _call_llm(self, prompt: str, n_feedbacks: int = 50) -> tuple[str, bool]:
         """
         Calls the primary model (Gemini). If quota is exhausted (429),
         falls back to Groq automatically.
@@ -70,11 +76,15 @@ class FeedbackTriageAgent:
                     "Please set GROQ_API_KEY in your Space secrets to enable fallback."
                 ) from e
 
+            max_tokens = min(
+                FALLBACK_MODEL_MAX_TOKENS,
+                _TOKENS_OVERHEAD + n_feedbacks * _TOKENS_PER_FEEDBACK,
+            )
             response = await self.groq_client.chat.completions.create(
                 model=FALLBACK_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
-                max_tokens=8192,
+                max_tokens=max_tokens,
             )
             return response.choices[0].message.content, True
 
@@ -147,7 +157,7 @@ Return ONLY valid JSON, no markdown, no surrounding text:
 If no corrections are needed, return "corrections": [].
 Be selective: only flag genuinely justified corrections."""
 
-        text, used_fallback = await self._call_llm(prompt)
+        text, used_fallback = await self._call_llm(prompt, n_feedbacks=len(feedbacks))
         data = self._parse_json_response(text)
         return data.get("feedbacks", []), data.get("corrections", []), used_fallback
 
@@ -195,7 +205,7 @@ Generate the report using EXACTLY this markdown structure:
 
 Be concise, factual and decision-oriented. Tone of a senior product consultant."""
 
-        text, used_fallback = await self._call_llm(prompt)
+        text, used_fallback = await self._call_llm(prompt, n_feedbacks=len(items))
         return text, used_fallback
 
     # ------------------------------------------------------------------
