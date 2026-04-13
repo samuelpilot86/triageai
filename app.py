@@ -348,7 +348,8 @@ async def on_message(message: cl.Message):
         for element in message.elements:
             if element.name.lower().endswith(".csv"):
                 try:
-                    df_input = pd.read_csv(element.path)
+                    # utf-8-sig handles BOM-encoded files (Excel exports)
+                    df_input = pd.read_csv(element.path, encoding="utf-8-sig")
 
                     feedback_col = df_input.columns[0]
                     for col in df_input.columns:
@@ -369,7 +370,12 @@ async def on_message(message: cl.Message):
                         .str.strip()
                         .tolist()
                     )
-                    feedbacks = [f for f in feedbacks if f and f != "nan"]
+                    # Exclude empty rows, "nan", and any row that exactly
+                    # matches the column name (header leaked into data)
+                    feedbacks = [
+                        f for f in feedbacks
+                        if f and f != "nan" and f.lower() != feedback_col.lower()
+                    ]
 
                     await cl.Message(
                         content=(
