@@ -1,6 +1,6 @@
 """
-agent.py — Logique de l'agent de triage de feedback produit
-Utilise Google Gemini 2.5 Flash via le SDK officiel google-genai.
+agent.py — Core logic of the product feedback triage agent.
+Uses Google Gemini 2.5 Flash via the official google-genai SDK.
 """
 
 import json
@@ -10,68 +10,68 @@ from google import genai
 
 
 CATEGORIES = [
-    "Bug / Erreur",
+    "Bug / Error",
     "Feature Request",
-    "UX / Ergonomie",
+    "UX / Usability",
     "Performance",
-    "Pricing / Tarification",
+    "Pricing",
     "Onboarding / Documentation",
-    "Support Client",
-    "Sécurité / Confidentialité",
-    "Autre",
+    "Customer Support",
+    "Security / Privacy",
+    "Other",
 ]
 
 
 class FeedbackTriageAgent:
-    """Agent de triage de feedback produit alimenté par Gemini 2.5 Flash."""
+    """Product feedback triage agent powered by Gemini 2.5 Flash."""
 
     def __init__(self, api_key: str):
         self.client = genai.Client(api_key=api_key)
         self.model = "gemini-2.5-flash-lite"
 
     # ------------------------------------------------------------------
-    # Étape 1 : Catégorisation & Auto-validation (appel unique)
+    # Step 1: Categorization + Self-validation (single LLM call)
     # ------------------------------------------------------------------
 
     async def categorize_and_validate(
         self, feedbacks: list[str]
     ) -> tuple[list[dict], list[dict]]:
         """
-        Catégorise les feedbacks ET s'auto-corrige en un seul appel LLM.
-        Retourne (items_finaux, liste_des_corrections).
+        Categorizes feedbacks AND self-corrects in a single LLM call.
+        Returns (final_items, corrections_list).
         """
         feedbacks_numbered = "\n".join(
             [f"{i + 1}. {f}" for i, f in enumerate(feedbacks)]
         )
         categories_str = ", ".join(CATEGORIES)
 
-        prompt = f"""Tu es un expert en analyse de feedback produit. Travaille en deux temps.
+        prompt = f"""You are an expert product feedback analyst. Work in two phases.
 
-FEEDBACKS À ANALYSER :
+FEEDBACKS TO ANALYZE:
 {feedbacks_numbered}
 
-═══ PHASE 1 — CATÉGORISATION ═══
-Pour chaque feedback, détermine :
-- id          : numéro (entier, commence à 1)
-- original    : texte original exact
-- summary     : résumé synthétique en 6 mots maximum
-- category    : UNE des catégories : {categories_str}
-- priority    : "Haute", "Moyenne" ou "Faible"
-  * Haute   = problème bloquant ou impact fort sur la rétention/acquisition
-  * Moyenne = gêne significative mais contournable
-  * Faible  = amélioration cosmétique ou cas rare
-- priority_reason : justification en 10 mots maximum
-- sentiment   : "Positif", "Neutre" ou "Négatif"
+═══ PHASE 1 — CATEGORIZATION ═══
+For each feedback, determine:
+- id          : item number (integer, starts at 1)
+- original    : exact original text
+- summary     : concise summary in 6 words or fewer
+- category    : ONE of: {categories_str}
+- priority    : "High", "Medium" or "Low"
+  * High   = blocking issue or strong impact on retention/acquisition
+  * Medium = significant friction but has a workaround
+  * Low    = cosmetic improvement or edge case
+- priority_reason : justification in 10 words or fewer
+- sentiment   : "Positive", "Neutral" or "Negative"
 
-═══ PHASE 2 — AUTO-CORRECTION ═══
-Relis tes propres décisions avec un regard critique :
-- La catégorie est-elle vraiment la plus précise ?
-- La priorité est-elle cohérente avec l'impact réel ?
-- Le sentiment reflète-t-il bien le texte original ?
-- Y a-t-il des incohérences entre feedbacks similaires ?
-Applique les corrections directement dans les feedbacks finaux.
+═══ PHASE 2 — SELF-CORRECTION ═══
+Review your own decisions critically:
+- Is the category truly the most accurate one?
+- Is the priority consistent with the real product impact?
+- Does the sentiment accurately reflect the original text?
+- Are there inconsistencies across similar feedbacks?
+Apply corrections directly in the final feedbacks output.
 
-Retourne UNIQUEMENT ce JSON valide, sans markdown, sans texte autour :
+Return ONLY valid JSON, no markdown, no surrounding text:
 {{
   "feedbacks": [
     {{
@@ -86,17 +86,17 @@ Retourne UNIQUEMENT ce JSON valide, sans markdown, sans texte autour :
   ],
   "corrections": [
     {{
-      "id": <id du feedback corrigé>,
+      "id": <corrected feedback id>,
       "field": "category" | "priority" | "sentiment",
-      "old_value": "valeur initiale",
-      "new_value": "valeur corrigée",
-      "reason": "justification en 10 mots max"
+      "old_value": "initial value",
+      "new_value": "corrected value",
+      "reason": "justification in 10 words max"
     }}
   ]
 }}
 
-Si aucune correction n'est nécessaire, retourne "corrections": [].
-Sois sélectif : ne signale que les corrections vraiment justifiées."""
+If no corrections are needed, return "corrections": [].
+Be selective: only flag genuinely justified corrections."""
 
         response = await self.client.aio.models.generate_content(
             model=self.model,
@@ -106,11 +106,11 @@ Sois sélectif : ne signale que les corrections vraiment justifiées."""
         return data.get("feedbacks", []), data.get("corrections", [])
 
     # ------------------------------------------------------------------
-    # Étape 3 : Rapport exécutif
+    # Step 2: Executive report
     # ------------------------------------------------------------------
 
     async def generate_report(self, items: list[dict]) -> str:
-        """Génère un rapport exécutif PM à partir des feedbacks catégorisés."""
+        """Generates a PM executive report from the categorized feedbacks."""
         df = pd.DataFrame(items)
 
         category_stats = df["category"].value_counts().to_dict()
@@ -118,33 +118,33 @@ Sois sélectif : ne signale que les corrections vraiment justifiées."""
         sentiment_stats = df["sentiment"].value_counts().to_dict()
 
         high_priority = (
-            df[df["priority"] == "Haute"][["summary", "category"]]
+            df[df["priority"] == "High"][["summary", "category"]]
             .head(5)
             .to_dict("records")
         )
 
-        prompt = f"""Tu es un Product Manager senior. Génère un rapport exécutif basé sur cette analyse de {len(items)} feedbacks utilisateurs.
+        prompt = f"""You are a senior Product Manager. Generate an executive report based on this analysis of {len(items)} user feedbacks.
 
-STATISTIQUES :
-- Par catégorie : {json.dumps(category_stats, ensure_ascii=False)}
-- Par priorité  : {json.dumps(priority_stats, ensure_ascii=False)}
-- Par sentiment : {json.dumps(sentiment_stats, ensure_ascii=False)}
-- Feedbacks haute priorité : {json.dumps(high_priority, ensure_ascii=False)}
+STATISTICS:
+- By category : {json.dumps(category_stats, ensure_ascii=False)}
+- By priority : {json.dumps(priority_stats, ensure_ascii=False)}
+- By sentiment: {json.dumps(sentiment_stats, ensure_ascii=False)}
+- High-priority feedbacks: {json.dumps(high_priority, ensure_ascii=False)}
 
-Génère le rapport avec EXACTEMENT cette structure markdown :
+Generate the report using EXACTLY this markdown structure:
 
-## Synthèse
-[2-3 phrases sur l'état général du produit perçu par les utilisateurs.]
+## Summary
+[2-3 sentences on the overall product perception from users.]
 
-## Top 3 des actions recommandées
-1. **[Action]** — [Justification courte orientée impact produit]
-2. **[Action]** — [Justification courte orientée impact produit]
-3. **[Action]** — [Justification courte orientée impact produit]
+## Top 3 Recommended Actions
+1. **[Action]** — [Short impact-oriented justification]
+2. **[Action]** — [Short impact-oriented justification]
+3. **[Action]** — [Short impact-oriented justification]
 
-## Signal faible à surveiller
-[1 insight non évident ou tendance émergente à investiguer]
+## Weak Signal to Watch
+[1 non-obvious insight or emerging trend worth investigating]
 
-Sois concis, factuel et orienté décision. Ton de consultant produit senior."""
+Be concise, factual and decision-oriented. Tone of a senior product consultant."""
 
         response = await self.client.aio.models.generate_content(
             model=self.model,
@@ -153,11 +153,11 @@ Sois concis, factuel et orienté décision. Ton de consultant produit senior."""
         return self._extract_text(response)
 
     # ------------------------------------------------------------------
-    # Utilitaires
+    # Utilities
     # ------------------------------------------------------------------
 
     def _extract_text(self, response) -> str:
-        """Extrait le texte de la réponse, compatible avec les modèles thinking."""
+        """Extracts text from the response, compatible with thinking models."""
         try:
             text = response.text
             if text:
@@ -174,7 +174,7 @@ Sois concis, factuel et orienté décision. Ton de consultant produit senior."""
             return ""
 
     def _parse_json_response(self, text: str) -> dict:
-        """Nettoie et parse la réponse JSON du LLM."""
+        """Cleans and parses the LLM JSON response."""
         if not text:
             return {}
         text = text.strip()

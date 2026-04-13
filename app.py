@@ -1,6 +1,6 @@
 """
-app.py — Interface Chainlit de l'agent TriageAI
-Déployé sur HuggingFace Spaces (Docker, port 7860).
+app.py — Chainlit interface for the TriageAI agent.
+Deployed on HuggingFace Spaces (Docker, port 7860).
 """
 
 import os
@@ -17,64 +17,64 @@ from scraper import (
 )
 
 # ------------------------------------------------------------------
-# Mapping visuels
+# Visual mappings
 # ------------------------------------------------------------------
 
-PRIORITY_EMOJI = {"Haute": "🔴", "Moyenne": "🟡", "Faible": "🟢"}
+PRIORITY_EMOJI = {"High": "🔴", "Medium": "🟡", "Low": "🟢"}
 
 CATEGORY_EMOJI = {
-    "Bug / Erreur": "🐛",
+    "Bug / Error": "🐛",
     "Feature Request": "✨",
-    "UX / Ergonomie": "🎨",
+    "UX / Usability": "🎨",
     "Performance": "⚡",
-    "Pricing / Tarification": "💰",
+    "Pricing": "💰",
     "Onboarding / Documentation": "📚",
-    "Support Client": "🎧",
-    "Sécurité / Confidentialité": "🔒",
-    "Autre": "📌",
+    "Customer Support": "🎧",
+    "Security / Privacy": "🔒",
+    "Other": "📌",
 }
 
 # ------------------------------------------------------------------
-# Message de bienvenue
+# Welcome message
 # ------------------------------------------------------------------
 
-WELCOME_MESSAGE = """# 🎯 TriageAI — Agent de Triage de Feedback Produit
+WELCOME_MESSAGE = """# 🎯 TriageAI — Product Feedback Triage Agent
 
-Bienvenue ! Je suis votre agent IA spécialisé dans l'analyse et la priorisation de feedbacks utilisateurs.
-
----
-
-### Comment utiliser cet outil
-
-**Option 1 — Coller vos feedbacks**
-Collez vos retours directement dans le chat, **un feedback par ligne**.
-
-**Option 2 — Uploader un CSV**
-Importez un fichier `.csv` avec une colonne `feedback` (ou la première colonne sera utilisée automatiquement).
-
-**Option 3 — Avis App Store / Google Play** *(nouveau !)*
-Tapez `apps` pour afficher le catalogue de 15 applications et lancer une récupération automatique des avis.
-
-> 💡 Un fichier `sample_feedbacks.csv` est disponible dans le repo pour tester immédiatement.
+Welcome! I'm your AI agent specialized in analyzing and prioritizing user feedbacks.
 
 ---
 
-### Ce que je fais automatiquement
+### How to use this tool
 
-- 🏷️ **Catégorise** chaque feedback (Bug, Feature Request, UX, Performance…)
-- 🔥 **Priorise** avec justification (Haute / Moyenne / Faible)
-- 😊 **Analyse le sentiment** (Positif / Neutre / Négatif)
-- 🔍 **S'auto-corrige** — relit ses propres décisions et les révise si nécessaire
-- 📊 **Génère un rapport exécutif** avec Top 3 recommandations
-- 💾 **Export CSV** des résultats téléchargeable
+**Option 1 — Paste your feedbacks**
+Paste your user feedback directly in the chat, **one feedback per line**.
+
+**Option 2 — Upload a CSV**
+Import a `.csv` file with a `feedback` column (or the first column will be used automatically).
+
+**Option 3 — App Store / Google Play reviews** *(new!)*
+Type `apps` to browse the catalog of 15 apps and automatically fetch their latest reviews.
+
+> 💡 A `sample_feedbacks.csv` file is available in the repo to test immediately.
 
 ---
 
-*Envoyez vos feedbacks, uploadez un CSV, ou tapez `apps` pour démarrer !*
+### What I do automatically
+
+- 🏷️ **Categorizes** each feedback (Bug, Feature Request, UX, Performance…)
+- 🔥 **Prioritizes** with justification (High / Medium / Low)
+- 😊 **Analyzes sentiment** (Positive / Neutral / Negative)
+- 🔍 **Self-corrects** — reviews its own decisions and revises them if needed
+- 📊 **Generates an executive report** with Top 3 recommendations
+- 💾 **CSV export** of results available for download
+
+---
+
+*Paste your feedbacks, upload a CSV, or type `apps` to get started!*
 """
 
 # ------------------------------------------------------------------
-# Initialisation de la session
+# Session initialization
 # ------------------------------------------------------------------
 
 
@@ -85,11 +85,11 @@ async def on_chat_start():
     if not api_key:
         await cl.Message(
             content=(
-                "⚠️ **Configuration manquante**\n\n"
-                "La variable d'environnement `GEMINI_API_KEY` n'est pas définie.\n\n"
-                "**Sur HuggingFace Spaces :** allez dans *Settings → Repository secrets* "
-                "et ajoutez `GEMINI_API_KEY` avec votre clé Google AI Studio.\n\n"
-                "Obtenez une clé gratuite sur [aistudio.google.com](https://aistudio.google.com/app/apikey)."
+                "⚠️ **Missing configuration**\n\n"
+                "The `GEMINI_API_KEY` environment variable is not set.\n\n"
+                "**On HuggingFace Spaces:** go to *Settings → Repository secrets* "
+                "and add `GEMINI_API_KEY` with your Google AI Studio key.\n\n"
+                "Get a free key at [aistudio.google.com](https://aistudio.google.com/app/apikey)."
             )
         ).send()
         return
@@ -102,81 +102,81 @@ async def on_chat_start():
 
 
 # ------------------------------------------------------------------
-# Pipeline principal (réutilisé par les 3 modes d'entrée)
+# Main pipeline (shared across all 3 input modes)
 # ------------------------------------------------------------------
 
 
 async def _run_pipeline(feedbacks: list[str], agent: FeedbackTriageAgent) -> None:
-    """Exécute les 4 étapes de l'agent sur une liste de feedbacks."""
+    """Runs the 3-step agent pipeline on a list of feedbacks."""
 
-    # Step 1 — Lecture
-    step1 = cl.Step(name="📥 Lecture des feedbacks", type="tool")
-    step1.input = f"{len(feedbacks)} feedbacks reçus."
-    step1.output = f"**{len(feedbacks)} feedbacks** reçus et prêts à l'analyse."
+    # Step 1 — Reading
+    step1 = cl.Step(name="📥 Loading feedbacks", type="tool")
+    step1.input = f"{len(feedbacks)} feedbacks received."
+    step1.output = f"**{len(feedbacks)} feedbacks** received and ready for analysis."
     await step1.send()
 
-    # Step 2 — Catégorisation & Auto-validation (appel LLM unique)
+    # Step 2 — Categorization & Self-validation (single LLM call)
     items: list[dict] = []
     corrections: list[dict] = []
     categorization_error = None
-    step2 = cl.Step(name="🏷️ Catégorisation, Priorisation & Auto-validation", type="llm")
-    step2.input = f"Analyse + auto-correction de {len(feedbacks)} feedbacks avec Gemini…"
-    step2.output = "⏳ En cours…"
+    step2 = cl.Step(name="🏷️ Categorization, Prioritization & Self-validation", type="llm")
+    step2.input = f"Analyzing + self-correcting {len(feedbacks)} feedbacks with Gemini…"
+    step2.output = "⏳ In progress…"
     await step2.send()
     try:
         items, corrections = await agent.categorize_and_validate(feedbacks)
-        lines = [f"✅ {len(items)} feedbacks catégorisés et validés."]
+        lines = [f"✅ {len(items)} feedbacks categorized and validated."]
         if corrections:
-            lines.append(f"🔍 **{len(corrections)} correction(s) auto-appliquée(s) :**")
+            lines.append(f"🔍 **{len(corrections)} auto-correction(s) applied:**")
             for c in corrections:
                 field_label = {
-                    "category": "catégorie",
-                    "priority": "priorité",
+                    "category": "category",
+                    "priority": "priority",
                     "sentiment": "sentiment",
                 }.get(c.get("field", ""), c.get("field", ""))
                 lines.append(
-                    f"- Feedback #{c.get('id')} — {field_label} : "
+                    f"- Feedback #{c.get('id')} — {field_label}: "
                     f"`{c.get('old_value')}` → **{c.get('new_value')}** "
                     f"*({c.get('reason', '')})*"
                 )
         else:
-            lines.append("🔍 Aucune correction nécessaire.")
+            lines.append("🔍 No corrections needed.")
         step2.output = "\n".join(lines)
     except Exception as e:
         categorization_error = str(e)
-        step2.output = f"❌ Erreur : {categorization_error}"
+        step2.output = f"❌ Error: {categorization_error}"
     await step2.update()
 
     if categorization_error:
         await cl.Message(
-            content=f"❌ **Erreur lors de la catégorisation**\n\n`{categorization_error}`"
+            content=f"❌ **Categorization error**\n\n`{categorization_error}`"
         ).send()
         return
 
-    # Step 3 — Rapport
+    # Step 3 — Executive report
     report = ""
     report_error = None
-    step4 = cl.Step(name="📊 Génération du rapport exécutif", type="llm")
-    step4.input = "Rédaction du rapport PM…"
-    step4.output = "⏳ En cours…"
+    step4 = cl.Step(name="📊 Generating executive report", type="llm")
+    step4.input = "Writing PM report…"
+    step4.output = "⏳ In progress…"
     await step4.send()
     try:
         report = await agent.generate_report(items)
-        step4.output = "✅ Rapport généré."
+        step4.output = "✅ Report generated."
     except Exception as e:
         report_error = str(e)
-        step4.output = f"❌ Erreur rapport : {report_error}"
+        step4.output = f"❌ Report error: {report_error}"
     await step4.update()
 
-    # Tableau détaillé
+    # Detailed results table
     if items:
         rows = [
-            "| # | Résumé | Catégorie | Priorité | Raison | Sentiment |",
-            "|---|--------|-----------|----------|--------|-----------|",
+            "| # | Summary | Category | Priority | Reason | Sentiment |",
+            "|---|---------|----------|----------|--------|-----------|",
         ]
         for item in items:
-            cat = item.get("category", "Autre")
-            prio = item.get("priority", "Moyenne")
+            cat = item.get("category", "Other")
+            prio = item.get("priority", "Medium")
             rows.append(
                 f"| {item.get('id', '')} "
                 f"| {item.get('summary', '')[:55]} "
@@ -186,38 +186,38 @@ async def _run_pipeline(feedbacks: list[str], agent: FeedbackTriageAgent) -> Non
                 f"| {item.get('sentiment', '')} |"
             )
         await cl.Message(
-            content="## 📋 Résultats détaillés\n\n" + "\n".join(rows)
+            content="## 📋 Detailed Results\n\n" + "\n".join(rows)
         ).send()
 
-    # Statistiques
+    # Statistics
     if items:
         df_r = pd.DataFrame(items)
         cat_counts = df_r["category"].value_counts()
         prio_counts = df_r["priority"].value_counts()
         sent_counts = df_r["sentiment"].value_counts()
 
-        stats = ["### 📈 Statistiques\n"]
-        stats.append("**Par catégorie :**")
+        stats = ["### 📈 Statistics\n"]
+        stats.append("**By category:**")
         for cat, count in cat_counts.items():
             pct = round(count / len(items) * 100)
             stats.append(
                 f"- {CATEGORY_EMOJI.get(cat, '📌')} {cat} — **{count}** ({pct}%)"
             )
-        stats.append("\n**Par priorité :**")
+        stats.append("\n**By priority:**")
         for prio, count in prio_counts.items():
             stats.append(f"- {PRIORITY_EMOJI.get(prio, '🟡')} {prio} — **{count}**")
-        stats.append("\n**Par sentiment :**")
+        stats.append("\n**By sentiment:**")
         for sent, count in sent_counts.items():
-            emoji = "😊" if sent == "Positif" else ("😐" if sent == "Neutre" else "😞")
+            emoji = "😊" if sent == "Positive" else ("😐" if sent == "Neutral" else "😞")
             stats.append(f"- {emoji} {sent} — **{count}**")
 
         await cl.Message(content="\n".join(stats)).send()
 
-    # Rapport exécutif
+    # Executive report
     if report:
-        await cl.Message(content=f"## 🎯 Rapport Exécutif\n\n{report}").send()
+        await cl.Message(content=f"## 🎯 Executive Report\n\n{report}").send()
 
-    # Export CSV
+    # CSV export
     if items:
         df_export = pd.DataFrame(items)
         tmp_path = "/tmp/triageai_results.csv"
@@ -230,15 +230,15 @@ async def _run_pipeline(feedbacks: list[str], agent: FeedbackTriageAgent) -> Non
                 mime="text/csv",
             )
         ]
-        await cl.Message(content="💾 **Export CSV prêt :**", elements=elements).send()
+        await cl.Message(content="💾 **CSV export ready:**", elements=elements).send()
 
     await cl.Message(
-        content="✅ **Analyse terminée !** Envoyez de nouveaux feedbacks pour relancer une analyse."
+        content="✅ **Analysis complete!** Send new feedbacks to run another analysis."
     ).send()
 
 
 # ------------------------------------------------------------------
-# Traitement des messages
+# Message handling
 # ------------------------------------------------------------------
 
 
@@ -248,7 +248,7 @@ async def on_message(message: cl.Message):
 
     if not agent:
         await cl.Message(
-            content="⚠️ Session expirée ou clé API manquante. Rechargez la page."
+            content="⚠️ Session expired or missing API key. Please reload the page."
         ).send()
         return
 
@@ -259,23 +259,23 @@ async def on_message(message: cl.Message):
     # Mode 3 — App Store / Google Play
     # ------------------------------------------------------------------
 
-    # Déclencheur : l'utilisateur veut voir le catalogue
+    # Trigger: user wants to browse the catalog
     if not message.elements and content_lower in APP_TRIGGER_KEYWORDS:
         await cl.Message(content=format_catalog_message()).send()
         cl.user_session.set("mode", "app_selection")
         return
 
-    # Sélection d'une app dans le catalogue
+    # App selection from catalog
     if cl.user_session.get("mode") == "app_selection" and not message.elements:
         app = find_app(content)
 
         if not app:
             await cl.Message(
                 content=(
-                    f"❌ Application introuvable : `{content}`\n\n"
-                    f"Tapez un numéro entre **1** et **{len(APP_CATALOG)}** "
-                    f"ou un nom d'app (ex: `calm`, `fitbit`).\n\n"
-                    f"Tapez `apps` pour revoir la liste."
+                    f"❌ App not found: `{content}`\n\n"
+                    f"Type a number between **1** and **{len(APP_CATALOG)}** "
+                    f"or an app name (e.g. `calm`, `fitbit`).\n\n"
+                    f"Type `apps` to see the list again."
                 )
             ).send()
             return
@@ -284,38 +284,37 @@ async def on_message(message: cl.Message):
 
         feedbacks: list[str] = []
         source = ""
-        step_scrape = cl.Step(name=f"🌐 Récupération des avis — {app['name']}", type="tool")
+        step_scrape = cl.Step(name=f"🌐 Fetching reviews — {app['name']}", type="tool")
         step_scrape.input = f"Scraping {app['name']} ({app['category']})…"
-        step_scrape.output = "⏳ En cours…"
+        step_scrape.output = "⏳ In progress…"
         await step_scrape.send()
         try:
             feedbacks, source = await fetch_reviews(app, count=50)
             if feedbacks:
                 step_scrape.output = (
-                    f"✅ **{len(feedbacks)} avis récupérés** depuis **{source}**."
+                    f"✅ **{len(feedbacks)} reviews fetched** from **{source}**."
                 )
             else:
-                step_scrape.output = "❌ Aucun avis récupéré (sources indisponibles)."
+                step_scrape.output = "❌ No reviews fetched (all sources unavailable)."
         except Exception as e:
-            step_scrape.output = f"❌ Erreur : {str(e)}"
+            step_scrape.output = f"❌ Error: {str(e)}"
         await step_scrape.update()
 
         if not feedbacks:
             await cl.Message(
                 content=(
-                    f"❌ **Impossible de récupérer les avis de {app['name']}**\n\n"
-                    "Google Play et App Store sont tous les deux indisponibles "
-                    "pour cette app.\n\n"
-                    "Essayez une autre application ou collez vos feedbacks manuellement."
+                    f"❌ **Could not fetch reviews for {app['name']}**\n\n"
+                    "Both Google Play and App Store are unavailable for this app.\n\n"
+                    "Try another app or paste your feedbacks manually."
                 )
             ).send()
             return
 
         await cl.Message(
             content=(
-                f"✅ **{len(feedbacks)} avis récupérés** depuis **{source}** "
-                f"pour **{app['name']}** ({app['category']})\n\n"
-                f"Lancement de l'analyse…"
+                f"✅ **{len(feedbacks)} reviews fetched** from **{source}** "
+                f"for **{app['name']}** ({app['category']})\n\n"
+                f"Starting analysis…"
             )
         ).send()
 
@@ -326,14 +325,14 @@ async def on_message(message: cl.Message):
         return
 
     # ------------------------------------------------------------------
-    # Mode 1 & 2 — CSV uploadé ou texte collé (comportement original)
+    # Mode 1 & 2 — Uploaded CSV or pasted text
     # ------------------------------------------------------------------
 
     cl.user_session.set("mode", None)
 
     feedbacks: list[str] = []
 
-    # --- Lecture d'un CSV uploadé ---
+    # --- Read uploaded CSV ---
     if message.elements:
         for element in message.elements:
             if element.name.lower().endswith(".csv"):
@@ -363,33 +362,33 @@ async def on_message(message: cl.Message):
 
                     await cl.Message(
                         content=(
-                            f"✅ **CSV importé avec succès**\n\n"
-                            f"- Fichier : `{element.name}`\n"
-                            f"- Colonne utilisée : `{feedback_col}`\n"
-                            f"- Feedbacks détectés : **{len(feedbacks)}**"
+                            f"✅ **CSV imported successfully**\n\n"
+                            f"- File: `{element.name}`\n"
+                            f"- Column used: `{feedback_col}`\n"
+                            f"- Feedbacks detected: **{len(feedbacks)}**"
                         )
                     ).send()
 
                 except Exception as e:
                     await cl.Message(
-                        content=f"❌ **Erreur lors de la lecture du CSV**\n\n`{str(e)}`"
+                        content=f"❌ **Error reading CSV**\n\n`{str(e)}`"
                     ).send()
                     return
 
-    # --- Lecture du texte collé ---
+    # --- Read pasted text ---
     if not feedbacks and content:
         lines = [line.strip() for line in content.split("\n") if line.strip()]
 
         if len(lines) < 2:
             await cl.Message(
                 content=(
-                    "💡 Entrez **au moins 2 feedbacks**, un par ligne — "
-                    "ou tapez `apps` pour récupérer des avis depuis l'App Store / Google Play.\n\n"
-                    "Exemple :\n"
+                    "💡 Please enter **at least 2 feedbacks**, one per line — "
+                    "or type `apps` to fetch reviews from the App Store / Google Play.\n\n"
+                    "Example:\n"
                     "```\n"
-                    "L'application plante au démarrage sur iOS\n"
-                    "Il manque un mode sombre, c'est fatiguant la nuit\n"
-                    "Le temps de chargement est beaucoup trop lent\n"
+                    "The app crashes on startup on iOS\n"
+                    "Dark mode is missing, it's straining at night\n"
+                    "Loading time is way too slow\n"
                     "```"
                 )
             ).send()
@@ -400,8 +399,8 @@ async def on_message(message: cl.Message):
     if not feedbacks:
         await cl.Message(
             content=(
-                "💡 Collez vos feedbacks (un par ligne), uploadez un CSV, "
-                "ou tapez `apps` pour récupérer des avis automatiquement."
+                "💡 Paste your feedbacks (one per line), upload a CSV, "
+                "or type `apps` to fetch reviews automatically."
             )
         ).send()
         return
@@ -409,8 +408,8 @@ async def on_message(message: cl.Message):
     if len(feedbacks) > 50:
         await cl.Message(
             content=(
-                f"⚠️ **Limite appliquée** : les **50 premiers feedbacks** sur {len(feedbacks)} "
-                f"seront analysés (limite du tier gratuit)."
+                f"⚠️ **Limit applied**: the **first 50 feedbacks** out of {len(feedbacks)} "
+                f"will be analyzed (free tier limit)."
             )
         ).send()
         feedbacks = feedbacks[:50]
