@@ -74,6 +74,7 @@ class FeedbackTriageAgent:
                 model=FALLBACK_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
+                max_tokens=8192,
             )
             return response.choices[0].message.content, True
 
@@ -219,11 +220,28 @@ Be concise, factual and decision-oriented. Tone of a senior product consultant."
             return ""
 
     def _parse_json_response(self, text: str) -> dict:
-        """Cleans and parses the LLM JSON response."""
+        """Cleans and parses the LLM JSON response. Handles truncated JSON."""
         if not text:
             return {}
         text = text.strip()
         text = re.sub(r"```(?:json)?\s*\n?", "", text)
         text = re.sub(r"\n?```", "", text)
         text = text.strip()
-        return json.loads(text)
+
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            # Response was likely truncated — attempt to recover the feedbacks array
+            match = re.search(r'"feedbacks"\s*:\s*(\[.*)', text, re.DOTALL)
+            if not match:
+                raise
+            array_text = match.group(1)
+            # Find the last complete object (ending with })
+            last_complete = array_text.rfind("},")
+            if last_complete == -1:
+                last_complete = array_text.rfind("}")
+            if last_complete == -1:
+                raise
+            recovered = array_text[: last_complete + 1] + "]"
+            feedbacks = json.loads(recovered)
+            return {"feedbacks": feedbacks, "corrections": []}
