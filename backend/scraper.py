@@ -7,180 +7,181 @@ non-commercial use, for research and demonstration purposes (portfolio MVP).
 """
 
 import asyncio
+import json
+import time
 import requests
 from typing import Optional
 
 try:
-    from google_play_scraper import reviews as gp_reviews, Sort
+    from google_play_scraper import reviews as gp_reviews, Sort, search as gp_search
     GOOGLE_PLAY_AVAILABLE = True
 except ImportError:
     GOOGLE_PLAY_AVAILABLE = False
 
 
 # ------------------------------------------------------------------
-# App catalog (HealthTech focus)
+# App Store category map (iTunes genre IDs)
 # ------------------------------------------------------------------
 
-APP_CATALOG = [
-    {
-        "id": 1,
-        "name": "MyFitnessPal",
-        "category": "Nutrition & Fitness",
-        "play_id": "com.myfitnesspal.android",
-        "ios_id": 321643882,
-    },
-    {
-        "id": 2,
-        "name": "Headspace",
-        "category": "Meditation & Mindfulness",
-        "play_id": "com.getsomeheadspace.android",
-        "ios_id": 493145008,
-    },
-    {
-        "id": 3,
-        "name": "Calm",
-        "category": "Sleep & Meditation",
-        "play_id": "com.calm.android",
-        "ios_id": 571800810,
-    },
-    {
-        "id": 4,
-        "name": "Fitbit",
-        "category": "Health & Activity",
-        "play_id": "com.fitbit.FitbitMobile",
-        "ios_id": 462638897,
-    },
-    {
-        "id": 5,
-        "name": "Strava",
-        "category": "Sport & Running",
-        "play_id": "com.strava",
-        "ios_id": 426826309,
-    },
-    {
-        "id": 6,
-        "name": "Noom",
-        "category": "Weight & Health Coaching",
-        "play_id": "com.noom.android",
-        "ios_id": 634598719,
-    },
-    {
-        "id": 7,
-        "name": "Flo",
-        "category": "Women's Health",
-        "play_id": "org.iggymedia.periodtracker",
-        "ios_id": 1038369691,
-    },
-    {
-        "id": 8,
-        "name": "Clue",
-        "category": "Women's Health",
-        "play_id": "com.clue.android",
-        "ios_id": 657189197,
-    },
-    {
-        "id": 9,
-        "name": "Sleep Cycle",
-        "category": "Sleep Tracking",
-        "play_id": "com.northcube.sleepcycle",
-        "ios_id": 320606217,
-    },
-    {
-        "id": 10,
-        "name": "Lifesum",
-        "category": "Nutrition & Diet",
-        "play_id": "com.lifesum.lifesum",
-        "ios_id": 286760398,
-    },
-    {
-        "id": 11,
-        "name": "BetterHelp",
-        "category": "Mental Health",
-        "play_id": "com.betterhelp",
-        "ios_id": 1069395979,
-    },
-    {
-        "id": 12,
-        "name": "Doctolib",
-        "category": "Telemedicine",
-        "play_id": "fr.doctolib.www",
-        "ios_id": 1234993343,
-    },
-    {
-        "id": 13,
-        "name": "Ada Health",
-        "category": "AI Diagnostics",
-        "play_id": "com.ada.app",
-        "ios_id": 1099191424,
-    },
-    {
-        "id": 14,
-        "name": "Peloton",
-        "category": "Fitness",
-        "play_id": "com.onepeloton.carrot",
-        "ios_id": 792750948,
-    },
-    {
-        "id": 15,
-        "name": "Nike Run Club",
-        "category": "Running",
-        "play_id": "com.nike.plusgps",
-        "ios_id": 387771637,
-    },
-]
-
-# Keywords that trigger the catalog display
-APP_TRIGGER_KEYWORDS = {
-    "apps", "app", "store", "marketplace", "app store", "google play",
-    "play store", "applications", "/apps", "catalog", "catalogue",
-    "reviews", "scraper",
+APP_STORE_CATEGORIES: dict[str, int] = {
+    "Books": 6018,
+    "Business": 6000,
+    "Developer Tools": 6026,
+    "Education": 6017,
+    "Entertainment": 6016,
+    "Finance": 6015,
+    "Food & Drink": 6023,
+    "Games": 6014,
+    "Graphics & Design": 6027,
+    "Health & Fitness": 6013,
+    "Lifestyle": 6012,
+    "Medical": 6020,
+    "Music": 6011,
+    "Navigation": 6010,
+    "News": 6009,
+    "Photo & Video": 6008,
+    "Productivity": 6007,
+    "Reference": 6006,
+    "Shopping": 6024,
+    "Social Networking": 6005,
+    "Sports": 6004,
+    "Travel": 6003,
+    "Utilities": 6002,
+    "Weather": 6001,
 }
 
+# Google Play category slugs (used with search fallback)
+GOOGLE_PLAY_CATEGORIES: list[str] = [
+    "Art & Design",
+    "Auto & Vehicles",
+    "Beauty",
+    "Books & Reference",
+    "Business",
+    "Comics",
+    "Communication",
+    "Dating",
+    "Education",
+    "Entertainment",
+    "Events",
+    "Finance",
+    "Food & Drink",
+    "Games",
+    "Health & Fitness",
+    "House & Home",
+    "Libraries & Demo",
+    "Lifestyle",
+    "Maps & Navigation",
+    "Medical",
+    "Music & Audio",
+    "News & Magazines",
+    "Parenting",
+    "Personalization",
+    "Photography",
+    "Productivity",
+    "Shopping",
+    "Social",
+    "Sports",
+    "Tools",
+    "Travel & Local",
+    "Video Players & Editors",
+    "Weather",
+]
+
 
 # ------------------------------------------------------------------
-# UI helpers
+# Simple TTL cache for store rankings (24h)
 # ------------------------------------------------------------------
 
-def format_catalog_message() -> str:
-    """Generates the catalog presentation message."""
-    lines = [
-        "## 📱 Select an Application\n",
-        "Automatically fetch the latest user reviews from "
-        "Google Play or the App Store.\n",
-        "| # | Application | Category |",
-        "|---|-------------|----------|",
-    ]
-    for app in APP_CATALOG:
-        lines.append(f"| **{app['id']}** | {app['name']} | {app['category']} |")
-    lines.append(
-        "\n*Type the **number** (e.g. `3`) or the **app name** (e.g. `calm`)*"
-    )
-    return "\n".join(lines)
+_cache: dict[str, tuple[float, list]] = {}
+_CACHE_TTL = 86_400  # 24 hours
 
 
-def find_app(query: str) -> Optional[dict]:
-    """Finds an app in the catalog by number or name (partial, case-insensitive)."""
-    query = query.strip()
-
-    # Search by number
-    if query.isdigit():
-        target_id = int(query)
-        for app in APP_CATALOG:
-            if app["id"] == target_id:
-                return app
-        return None
-
-    # Search by name
-    query_lower = query.lower()
-    for app in APP_CATALOG:
-        if query_lower in app["name"].lower():
-            return app
-
+def _cache_get(key: str) -> Optional[list]:
+    entry = _cache.get(key)
+    if entry and time.time() - entry[0] < _CACHE_TTL:
+        return entry[1]
     return None
 
 
+def _cache_set(key: str, value: list) -> None:
+    _cache[key] = (time.time(), value)
+
+
 # ------------------------------------------------------------------
-# Fetchers
+# App Store — top apps by category
+# ------------------------------------------------------------------
+
+async def fetch_appstore_top_apps(category: str, count: int = 10) -> list[dict]:
+    """Returns top free apps for a given App Store category."""
+    genre_id = APP_STORE_CATEGORIES.get(category)
+    if not genre_id:
+        return []
+
+    cache_key = f"appstore:{category}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    url = f"https://itunes.apple.com/us/rss/topfreeapplications/limit={count}/genre={genre_id}/json"
+    loop = asyncio.get_event_loop()
+    try:
+        response = await loop.run_in_executor(
+            None,
+            lambda: requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"}),
+        )
+        response.raise_for_status()
+        data = response.json()
+        entries = data.get("feed", {}).get("entry", [])
+        apps = [
+            {
+                "id": e["id"]["attributes"]["im:id"],
+                "name": e["im:name"]["label"],
+                "store": "appstore",
+            }
+            for e in entries
+        ]
+        _cache_set(cache_key, apps)
+        return apps
+    except Exception:
+        return []
+
+
+# ------------------------------------------------------------------
+# Google Play — top apps by category (via search)
+# ------------------------------------------------------------------
+
+async def fetch_googleplay_top_apps(category: str, count: int = 10) -> list[dict]:
+    """Returns top apps for a given Google Play category via search."""
+    if not GOOGLE_PLAY_AVAILABLE:
+        return []
+
+    cache_key = f"googleplay:{category}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    loop = asyncio.get_event_loop()
+    try:
+        results = await loop.run_in_executor(
+            None,
+            lambda: gp_search(category, n_hits=count, lang="en", country="us"),
+        )
+        apps = [
+            {
+                "id": r["appId"],
+                "name": r["title"],
+                "store": "googleplay",
+            }
+            for r in results[:count]
+        ]
+        _cache_set(cache_key, apps)
+        return apps
+    except Exception:
+        return []
+
+
+# ------------------------------------------------------------------
+# Review fetchers
 # ------------------------------------------------------------------
 
 async def fetch_play_store_reviews(play_id: str, count: int = 50) -> list[str]:
@@ -201,7 +202,7 @@ async def fetch_play_store_reviews(play_id: str, count: int = 50) -> list[str]:
     return [r["content"] for r in result if r.get("content")]
 
 
-async def fetch_app_store_reviews(ios_id: int, count: int = 50) -> list[str]:
+async def fetch_app_store_reviews(ios_id: str, count: int = 50) -> list[str]:
     """Fetches reviews from the App Store via Apple's public RSS feed."""
     url = (
         f"https://itunes.apple.com/rss/customerreviews/"
@@ -210,17 +211,12 @@ async def fetch_app_store_reviews(ios_id: int, count: int = 50) -> list[str]:
     loop = asyncio.get_event_loop()
     response = await loop.run_in_executor(
         None,
-        lambda: requests.get(
-            url,
-            timeout=15,
-            headers={"User-Agent": "Mozilla/5.0"},
-        ),
+        lambda: requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"}),
     )
     response.raise_for_status()
     data = response.json()
 
     entries = data.get("feed", {}).get("entry", [])
-    # First entry is often app metadata, not a review
     if entries and "im:rating" not in str(entries[0]):
         entries = entries[1:]
 
@@ -231,29 +227,3 @@ async def fetch_app_store_reviews(ios_id: int, count: int = 50) -> list[str]:
             reviews.append(content)
 
     return reviews
-
-
-async def fetch_reviews(app: dict, count: int = 50) -> tuple[list[str], str]:
-    """
-    Fetches reviews for an app: tries Google Play first, then App Store.
-    Returns (reviews_list, source_used).
-    """
-    # Try Google Play
-    if app.get("play_id") and GOOGLE_PLAY_AVAILABLE:
-        try:
-            reviews = await fetch_play_store_reviews(app["play_id"], count)
-            if reviews:
-                return reviews, "Google Play"
-        except Exception:
-            pass
-
-    # Try App Store
-    if app.get("ios_id"):
-        try:
-            reviews = await fetch_app_store_reviews(app["ios_id"], count)
-            if reviews:
-                return reviews, "App Store"
-        except Exception:
-            pass
-
-    return [], "no source available"
