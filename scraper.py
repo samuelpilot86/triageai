@@ -1,9 +1,9 @@
 """
-scraper.py — Extraction automatique d'avis utilisateurs depuis les app stores.
+scraper.py — Automated user review extraction from app stores.
 
-Note : Le scraping des marketplaces (Google Play, App Store) est en zone grise
-vis-à-vis des CGU de ces plateformes. Ce module est destiné exclusivement à un
-usage non-commercial, à des fins de recherche et démonstration (MVP portfolio).
+Note: Scraping app marketplaces (Google Play, App Store) is a legal grey area
+with respect to their Terms of Service. This module is intended exclusively for
+non-commercial use, for research and demonstration purposes (portfolio MVP).
 """
 
 import asyncio
@@ -18,7 +18,7 @@ except ImportError:
 
 
 # ------------------------------------------------------------------
-# Catalogue d'applications (focus HealthTech)
+# App catalog (HealthTech focus)
 # ------------------------------------------------------------------
 
 APP_CATALOG = [
@@ -32,21 +32,21 @@ APP_CATALOG = [
     {
         "id": 2,
         "name": "Headspace",
-        "category": "Méditation & Mindfulness",
+        "category": "Meditation & Mindfulness",
         "play_id": "com.getsomeheadspace.android",
         "ios_id": 493145008,
     },
     {
         "id": 3,
         "name": "Calm",
-        "category": "Sommeil & Méditation",
+        "category": "Sleep & Meditation",
         "play_id": "com.calm.android",
         "ios_id": 571800810,
     },
     {
         "id": 4,
         "name": "Fitbit",
-        "category": "Santé & Activité",
+        "category": "Health & Activity",
         "play_id": "com.fitbit.FitbitMobile",
         "ios_id": 462638897,
     },
@@ -60,56 +60,56 @@ APP_CATALOG = [
     {
         "id": 6,
         "name": "Noom",
-        "category": "Poids & Coaching Santé",
+        "category": "Weight & Health Coaching",
         "play_id": "com.noom.android",
         "ios_id": 634598719,
     },
     {
         "id": 7,
         "name": "Flo",
-        "category": "Santé Féminine",
+        "category": "Women's Health",
         "play_id": "org.iggymedia.periodtracker",
         "ios_id": 1038369691,
     },
     {
         "id": 8,
         "name": "Clue",
-        "category": "Santé Féminine",
+        "category": "Women's Health",
         "play_id": "com.clue.android",
         "ios_id": 657189197,
     },
     {
         "id": 9,
         "name": "Sleep Cycle",
-        "category": "Analyse du Sommeil",
+        "category": "Sleep Tracking",
         "play_id": "com.northcube.sleepcycle",
         "ios_id": 320606217,
     },
     {
         "id": 10,
         "name": "Lifesum",
-        "category": "Nutrition & Régime",
+        "category": "Nutrition & Diet",
         "play_id": "com.lifesum.lifesum",
         "ios_id": 286760398,
     },
     {
         "id": 11,
         "name": "BetterHelp",
-        "category": "Santé Mentale",
+        "category": "Mental Health",
         "play_id": "com.betterhelp",
         "ios_id": 1069395979,
     },
     {
         "id": 12,
         "name": "Doctolib",
-        "category": "Télémédecine",
+        "category": "Telemedicine",
         "play_id": "fr.doctolib.www",
         "ios_id": 1234993343,
     },
     {
         "id": 13,
         "name": "Ada Health",
-        "category": "Diagnostic IA",
+        "category": "AI Diagnostics",
         "play_id": "com.ada.app",
         "ios_id": 1099191424,
     },
@@ -129,40 +129,40 @@ APP_CATALOG = [
     },
 ]
 
-# Mots-clés qui déclenchent l'affichage du catalogue
+# Keywords that trigger the catalog display
 APP_TRIGGER_KEYWORDS = {
     "apps", "app", "store", "marketplace", "app store", "google play",
     "play store", "applications", "/apps", "catalog", "catalogue",
-    "avis", "reviews", "scraper",
+    "reviews", "scraper",
 }
 
 
 # ------------------------------------------------------------------
-# Helpers UI
+# UI helpers
 # ------------------------------------------------------------------
 
 def format_catalog_message() -> str:
-    """Génère le message de présentation du catalogue."""
+    """Generates the catalog presentation message."""
     lines = [
-        "## 📱 Sélectionnez une application\n",
-        "Récupération automatique des derniers avis utilisateurs depuis "
-        "Google Play ou l'App Store.\n",
-        "| # | Application | Catégorie |",
-        "|---|-------------|-----------|",
+        "## 📱 Select an Application\n",
+        "Automatically fetch the latest user reviews from "
+        "Google Play or the App Store.\n",
+        "| # | Application | Category |",
+        "|---|-------------|----------|",
     ]
     for app in APP_CATALOG:
         lines.append(f"| **{app['id']}** | {app['name']} | {app['category']} |")
     lines.append(
-        "\n*Tapez le **numéro** (ex: `3`) ou le **nom** de l'app (ex: `calm`)*"
+        "\n*Type the **number** (e.g. `3`) or the **app name** (e.g. `calm`)*"
     )
     return "\n".join(lines)
 
 
 def find_app(query: str) -> Optional[dict]:
-    """Trouve une app dans le catalogue par numéro ou nom (partiel, insensible à la casse)."""
+    """Finds an app in the catalog by number or name (partial, case-insensitive)."""
     query = query.strip()
 
-    # Recherche par numéro
+    # Search by number
     if query.isdigit():
         target_id = int(query)
         for app in APP_CATALOG:
@@ -170,7 +170,7 @@ def find_app(query: str) -> Optional[dict]:
                 return app
         return None
 
-    # Recherche par nom
+    # Search by name
     query_lower = query.lower()
     for app in APP_CATALOG:
         if query_lower in app["name"].lower():
@@ -184,9 +184,9 @@ def find_app(query: str) -> Optional[dict]:
 # ------------------------------------------------------------------
 
 async def fetch_play_store_reviews(play_id: str, count: int = 50) -> list[str]:
-    """Récupère les avis les plus récents depuis le Google Play Store."""
+    """Fetches the most recent reviews from the Google Play Store."""
     if not GOOGLE_PLAY_AVAILABLE:
-        raise ImportError("google-play-scraper non installé.")
+        raise ImportError("google-play-scraper is not installed.")
 
     loop = asyncio.get_event_loop()
     result, _ = await loop.run_in_executor(
@@ -202,7 +202,7 @@ async def fetch_play_store_reviews(play_id: str, count: int = 50) -> list[str]:
 
 
 async def fetch_app_store_reviews(ios_id: int, count: int = 50) -> list[str]:
-    """Récupère les avis depuis l'App Store via le flux RSS public d'Apple."""
+    """Fetches reviews from the App Store via Apple's public RSS feed."""
     url = (
         f"https://itunes.apple.com/rss/customerreviews/"
         f"id={ios_id}/sortBy=mostRecent/json"
@@ -220,7 +220,7 @@ async def fetch_app_store_reviews(ios_id: int, count: int = 50) -> list[str]:
     data = response.json()
 
     entries = data.get("feed", {}).get("entry", [])
-    # La première entrée est souvent les métadonnées de l'app, pas un avis
+    # First entry is often app metadata, not a review
     if entries and "im:rating" not in str(entries[0]):
         entries = entries[1:]
 
@@ -235,10 +235,10 @@ async def fetch_app_store_reviews(ios_id: int, count: int = 50) -> list[str]:
 
 async def fetch_reviews(app: dict, count: int = 50) -> tuple[list[str], str]:
     """
-    Récupère les avis d'une app : essaie Google Play en premier, puis App Store.
-    Retourne (liste_avis, source_utilisée).
+    Fetches reviews for an app: tries Google Play first, then App Store.
+    Returns (reviews_list, source_used).
     """
-    # Tentative Google Play
+    # Try Google Play
     if app.get("play_id") and GOOGLE_PLAY_AVAILABLE:
         try:
             reviews = await fetch_play_store_reviews(app["play_id"], count)
@@ -247,7 +247,7 @@ async def fetch_reviews(app: dict, count: int = 50) -> tuple[list[str], str]:
         except Exception:
             pass
 
-    # Tentative App Store
+    # Try App Store
     if app.get("ios_id"):
         try:
             reviews = await fetch_app_store_reviews(app["ios_id"], count)
@@ -256,4 +256,4 @@ async def fetch_reviews(app: dict, count: int = 50) -> tuple[list[str], str]:
         except Exception:
             pass
 
-    return [], "aucune source disponible"
+    return [], "no source available"
