@@ -261,17 +261,18 @@ Generate the report using EXACTLY this markdown structure:
 [2-3 sentences on the overall product health, referencing the dominant issue themes specifically.]
 
 ## Top 3 Recommended Actions
-1. **[Specific action targeting the most frequent issue]** — [Justification with numbers: how many users affected, expected impact]
-2. **[Specific action targeting the 2nd issue cluster]** — [Justification with numbers]
-3. **[Specific action targeting the 3rd issue cluster]** — [Justification with numbers]
+1. **[Action title: verb + specific component/flow, e.g. "Fix appointment filter returning empty results"]** — [What exactly breaks, how many users reported it, direct impact on retention or conversion]
+2. **[Action title: same format]** — [Same detail level]
+3. **[Action title: same format]** — [Same detail level]
 
 ## Weak Signal to Watch
 [1 non-obvious insight — a low-frequency issue that could become critical, or an unexpected pattern in the data]
 
 Rules:
-- Name the actual issues (e.g. "fix filter search bug" not "fix bugs")
+- Each action title must name the specific feature or flow affected, not the category (write "fix appointment date picker crash on iOS" not "fix bugs")
+- If multiple distinct issues fall in the same category, pick the single most impactful one for the action — mention the others in the justification
 - Include counts/percentages to justify prioritization
-- Each action must be specific enough to go directly into a sprint backlog
+- Actions must be specific enough to copy directly into a sprint backlog as a ticket title
 - Tone: senior product consultant, concise, decision-oriented"""
 
         # Report output is always short (~800-1200 tokens), regardless of input size
