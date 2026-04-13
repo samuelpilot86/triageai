@@ -32,6 +32,12 @@ FALLBACK_MODEL_MAX_TOKENS = 32_768  # llama-3.3-70b-versatile hard limit
 _TOKENS_PER_FEEDBACK = 250
 _TOKENS_OVERHEAD = 512
 
+# Groq free tier: 12 000 TPM (input + output combined).
+# At ~1 500 tokens of input overhead + 250 per feedback output,
+# max safe feedbacks per call = floor((12000 - 1500) / 250) = 42.
+# Use 20 to leave a comfortable margin.
+GROQ_CHUNK_SIZE = 20
+
 
 class FeedbackTriageAgent:
     """
@@ -47,66 +53,13 @@ class FeedbackTriageAgent:
     # Central LLM call with fallback
     # ------------------------------------------------------------------
 
-    async def _call_llm(self, prompt: str, n_feedbacks: int | None = None, max_tokens: int | None = None) -> tuple[str, bool]:
-        """
-        Calls the primary model (Gemini). If quota is exhausted (429),
-        falls back to Groq automatically.
-        Returns (response_text, used_fallback).
-        Raises if both models fail or Groq is not configured.
-        """
-        # Try Gemini first
-        try:
-            response = await self.client.aio.models.generate_content(
-                model=PRIMARY_MODEL,
-                contents=prompt,
-            )
-            return self._extract_text(response), False
-
-        except Exception as e:
-            error_str = str(e)
-            is_quota = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str
-
-            if not is_quota:
-                raise  # Non-quota error: propagate immediately
-
-            # Quota exhausted — try Groq fallback
-            if not self.groq_client:
-                raise RuntimeError(
-                    "Gemini quota exhausted and no GROQ_API_KEY configured. "
-                    "Please set GROQ_API_KEY in your Space secrets to enable fallback."
-                ) from e
-
-            if max_tokens is None:
-                n = n_feedbacks or 50
-                max_tokens = min(
-                    FALLBACK_MODEL_MAX_TOKENS,
-                    _TOKENS_OVERHEAD + n * _TOKENS_PER_FEEDBACK,
-                )
-            response = await self.groq_client.chat.completions.create(
-                model=FALLBACK_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=max_tokens,
-            )
-            return response.choices[0].message.content, True
-
-    # ------------------------------------------------------------------
-    # Step 1: Categorization + Self-validation (single LLM call)
-    # ------------------------------------------------------------------
-
-    async def categorize_and_validate(
-        self, feedbacks: list[str]
-    ) -> tuple[list[dict], list[dict], bool]:
-        """
-        Categorizes feedbacks AND self-corrects in a single LLM call.
-        Returns (final_items, corrections_list, used_fallback).
-        """
+    def _build_categorization_prompt(self, feedbacks: list[str]) -> str:
+        """Builds the categorization+validation prompt for a list of feedbacks."""
         feedbacks_numbered = "\n".join(
             [f"{i + 1}. {f}" for i, f in enumerate(feedbacks)]
         )
         categories_str = ", ".join(CATEGORIES)
-
-        prompt = f"""You are an expert product feedback analyst. Work in two phases.
+        return f"""You are an expert product feedback analyst. Work in two phases.
 
 FEEDBACKS TO ANALYZE:
 {feedbacks_numbered}
@@ -159,9 +112,111 @@ Return ONLY valid JSON, no markdown, no surrounding text:
 If no corrections are needed, return "corrections": [].
 Be selective: only flag genuinely justified corrections."""
 
-        text, used_fallback = await self._call_llm(prompt, n_feedbacks=len(feedbacks))
-        data = self._parse_json_response(text)
-        return data.get("feedbacks", []), data.get("corrections", []), used_fallback
+    async def _categorize_chunked(
+        self, feedbacks: list[str], chunk_size: int
+    ) -> tuple[list[dict], list[dict]]:
+        """
+        Processes feedbacks in chunks to stay within Groq TPM limits.
+        Merges results and re-sequences IDs globally.
+        """
+        all_items: list[dict] = []
+        all_corrections: list[dict] = []
+        global_offset = 0
+
+        for i in range(0, len(feedbacks), chunk_size):
+            chunk = feedbacks[i : i + chunk_size]
+            prompt = self._build_categorization_prompt(chunk)
+            text, _ = await self._call_llm(
+                prompt, n_feedbacks=len(chunk), _force_groq=True
+            )
+            data = self._parse_json_response(text)
+            chunk_items = data.get("feedbacks", [])
+            chunk_corrections = data.get("corrections", [])
+
+            # Re-sequence IDs globally across chunks
+            for item in chunk_items:
+                item["id"] = global_offset + item["id"]
+            for correction in chunk_corrections:
+                correction["id"] = global_offset + correction["id"]
+
+            all_items.extend(chunk_items)
+            all_corrections.extend(chunk_corrections)
+            global_offset += len(chunk)
+
+        return all_items, all_corrections
+
+    async def _call_llm(self, prompt: str, n_feedbacks: int | None = None, max_tokens: int | None = None, _force_groq: bool = False) -> tuple[str, bool]:
+        """
+        Calls the primary model (Gemini). If quota is exhausted (429),
+        falls back to Groq automatically.
+        Returns (response_text, used_fallback).
+        Raises if both models fail or Groq is not configured.
+        """
+        # Try Gemini first (unless forced to Groq for chunked calls)
+        if not _force_groq:
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=PRIMARY_MODEL,
+                    contents=prompt,
+                )
+                return self._extract_text(response), False
+
+            except Exception as e:
+                error_str = str(e)
+                is_quota = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str
+
+                if not is_quota:
+                    raise  # Non-quota error: propagate immediately
+
+        if not self.groq_client:
+            raise RuntimeError(
+                "Gemini quota exhausted and no GROQ_API_KEY configured. "
+                "Please set GROQ_API_KEY in your Space secrets to enable fallback."
+            )
+
+        if max_tokens is None:
+            n = n_feedbacks or 50
+            max_tokens = min(
+                FALLBACK_MODEL_MAX_TOKENS,
+                _TOKENS_OVERHEAD + n * _TOKENS_PER_FEEDBACK,
+            )
+        response = await self.groq_client.chat.completions.create(
+            model=FALLBACK_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=max_tokens,
+        )
+        return response.choices[0].message.content, True
+
+    # ------------------------------------------------------------------
+    # Step 1: Categorization + Self-validation (single LLM call)
+    # ------------------------------------------------------------------
+
+    async def categorize_and_validate(
+        self, feedbacks: list[str]
+    ) -> tuple[list[dict], list[dict], bool]:
+        """
+        Categorizes feedbacks AND self-corrects in a single LLM call.
+        Returns (final_items, corrections_list, used_fallback).
+        """
+        prompt = self._build_categorization_prompt(feedbacks)
+
+        try:
+            text, used_fallback = await self._call_llm(prompt, n_feedbacks=len(feedbacks))
+            data = self._parse_json_response(text)
+            return data.get("feedbacks", []), data.get("corrections", []), used_fallback
+        except Exception as e:
+            error_str = str(e)
+            is_quota = (
+                "429" in error_str
+                or "RESOURCE_EXHAUSTED" in error_str
+                or "413" in error_str
+                or "Request too large" in error_str
+            )
+            if not is_quota or not self.groq_client:
+                raise
+            items, corrections = await self._categorize_chunked(feedbacks, GROQ_CHUNK_SIZE)
+            return items, corrections, True
 
     # ------------------------------------------------------------------
     # Step 2: Executive report
