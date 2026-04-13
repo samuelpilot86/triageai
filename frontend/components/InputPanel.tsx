@@ -26,7 +26,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
   const [text, setText] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [store, setStore] = useState<Store>("googleplay");
+  const [store, setStore] = useState<Store>("appstore");
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [apps, setApps] = useState<AppEntry[]>([]);
@@ -147,7 +147,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
         <div className="space-y-4">
           {/* Store toggle */}
           <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
-            {(["googleplay", "appstore"] as Store[]).map((s) => (
+            {(["appstore", "googleplay"] as Store[]).map((s) => (
               <button
                 key={s}
                 onClick={() => setStore(s)}
