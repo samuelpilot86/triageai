@@ -14,9 +14,7 @@ WORKDIR $HOME/app
 
 # Installer les dépendances Python
 COPY --chown=user requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip show chainlit | grep -E "^(Name|Version)" && \
-    pip show google-genai | grep -E "^(Name|Version)"
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copier le code de l'application
 COPY --chown=user . .
