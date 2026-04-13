@@ -238,6 +238,7 @@ async def _run_pipeline(feedbacks: list[str], agent: FeedbackTriageAgent) -> Non
                 name="triageai_results.csv",
                 path=tmp_path,
                 display="inline",
+                mime="text/csv",
             )
         ]
         await cl.Message(content="💾 **Export CSV prêt :**", elements=elements).send()
