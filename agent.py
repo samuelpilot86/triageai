@@ -47,7 +47,7 @@ class FeedbackTriageAgent:
     # Central LLM call with fallback
     # ------------------------------------------------------------------
 
-    async def _call_llm(self, prompt: str, n_feedbacks: int = 50) -> tuple[str, bool]:
+    async def _call_llm(self, prompt: str, n_feedbacks: int | None = None, max_tokens: int | None = None) -> tuple[str, bool]:
         """
         Calls the primary model (Gemini). If quota is exhausted (429),
         falls back to Groq automatically.
@@ -76,10 +76,12 @@ class FeedbackTriageAgent:
                     "Please set GROQ_API_KEY in your Space secrets to enable fallback."
                 ) from e
 
-            max_tokens = min(
-                FALLBACK_MODEL_MAX_TOKENS,
-                _TOKENS_OVERHEAD + n_feedbacks * _TOKENS_PER_FEEDBACK,
-            )
+            if max_tokens is None:
+                n = n_feedbacks or 50
+                max_tokens = min(
+                    FALLBACK_MODEL_MAX_TOKENS,
+                    _TOKENS_OVERHEAD + n * _TOKENS_PER_FEEDBACK,
+                )
             response = await self.groq_client.chat.completions.create(
                 model=FALLBACK_MODEL,
                 messages=[{"role": "user", "content": prompt}],
@@ -205,7 +207,8 @@ Generate the report using EXACTLY this markdown structure:
 
 Be concise, factual and decision-oriented. Tone of a senior product consultant."""
 
-        text, used_fallback = await self._call_llm(prompt, n_feedbacks=len(items))
+        # Report output is always short (~800-1200 tokens), regardless of input size
+        text, used_fallback = await self._call_llm(prompt, max_tokens=2048)
         return text, used_fallback
 
     # ------------------------------------------------------------------
