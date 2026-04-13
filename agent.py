@@ -30,37 +30,48 @@ class FeedbackTriageAgent:
         self.model = "gemini-2.5-flash-lite"
 
     # ------------------------------------------------------------------
-    # Étape 1 : Catégorisation & Priorisation
+    # Étape 1 : Catégorisation & Auto-validation (appel unique)
     # ------------------------------------------------------------------
 
-    async def categorize_feedbacks(self, feedbacks: list[str]) -> list[dict]:
+    async def categorize_and_validate(
+        self, feedbacks: list[str]
+    ) -> tuple[list[dict], list[dict]]:
         """
-        Envoie tous les feedbacks en un seul appel LLM et retourne
-        une liste de dicts structurés (catégorie, priorité, sentiment…).
+        Catégorise les feedbacks ET s'auto-corrige en un seul appel LLM.
+        Retourne (items_finaux, liste_des_corrections).
         """
         feedbacks_numbered = "\n".join(
             [f"{i + 1}. {f}" for i, f in enumerate(feedbacks)]
         )
         categories_str = ", ".join(CATEGORIES)
 
-        prompt = f"""Tu es un expert en analyse de feedback produit. Analyse ces {len(feedbacks)} feedbacks utilisateurs.
+        prompt = f"""Tu es un expert en analyse de feedback produit. Travaille en deux temps.
 
-FEEDBACKS :
+FEEDBACKS À ANALYSER :
 {feedbacks_numbered}
 
-Pour chaque feedback, retourne un objet avec ces champs :
-- id          : numéro du feedback (entier, commence à 1)
-- original    : texte original exact du feedback
+═══ PHASE 1 — CATÉGORISATION ═══
+Pour chaque feedback, détermine :
+- id          : numéro (entier, commence à 1)
+- original    : texte original exact
 - summary     : résumé synthétique en 6 mots maximum
-- category    : UNE des catégories suivantes : {categories_str}
+- category    : UNE des catégories : {categories_str}
 - priority    : "Haute", "Moyenne" ou "Faible"
-  * Haute    = impact fort sur la rétention ou l'acquisition, ou problème bloquant
-  * Moyenne  = gêne significative mais contournable
-  * Faible   = amélioration cosmétique ou rare
-- priority_reason : justification de la priorité en 10 mots maximum
+  * Haute   = problème bloquant ou impact fort sur la rétention/acquisition
+  * Moyenne = gêne significative mais contournable
+  * Faible  = amélioration cosmétique ou cas rare
+- priority_reason : justification en 10 mots maximum
 - sentiment   : "Positif", "Neutre" ou "Négatif"
 
-IMPORTANT : Retourne UNIQUEMENT ce JSON valide, sans markdown, sans texte autour :
+═══ PHASE 2 — AUTO-CORRECTION ═══
+Relis tes propres décisions avec un regard critique :
+- La catégorie est-elle vraiment la plus précise ?
+- La priorité est-elle cohérente avec l'impact réel ?
+- Le sentiment reflète-t-il bien le texte original ?
+- Y a-t-il des incohérences entre feedbacks similaires ?
+Applique les corrections directement dans les feedbacks finaux.
+
+Retourne UNIQUEMENT ce JSON valide, sans markdown, sans texte autour :
 {{
   "feedbacks": [
     {{
@@ -72,69 +83,27 @@ IMPORTANT : Retourne UNIQUEMENT ce JSON valide, sans markdown, sans texte autour
       "priority_reason": "...",
       "sentiment": "..."
     }}
-  ]
-}}"""
-
-        response = await self.client.aio.models.generate_content(
-            model=self.model,
-            contents=prompt,
-        )
-        return self._parse_json_response(self._extract_text(response)).get("feedbacks", [])
-
-    # ------------------------------------------------------------------
-    # Étape 2 : Auto-validation réflexive
-    # ------------------------------------------------------------------
-
-    async def validate_and_correct(self, items: list[dict]) -> tuple[list[dict], list[dict]]:
-        """
-        L'agent relit ses propres catégorisations et se corrige si nécessaire.
-        Retourne (items_corrigés, liste_des_corrections).
-        """
-        items_json = json.dumps(items, ensure_ascii=False, indent=2)
-        categories_str = ", ".join(CATEGORIES)
-
-        prompt = f"""Tu es un expert en analyse de feedback produit. Tu viens de catégoriser ces feedbacks et tu dois maintenant auditer ton propre travail avec un regard critique.
-
-CATÉGORISATIONS À AUDITER :
-{items_json}
-
-Revois chaque feedback de manière indépendante et identifie les erreurs éventuelles :
-- La catégorie est-elle vraiment la plus précise parmi : {categories_str} ?
-- La priorité (Haute/Moyenne/Faible) est-elle cohérente avec l'impact réel sur le produit ?
-- Le sentiment (Positif/Neutre/Négatif) reflète-t-il bien le texte original ?
-- Y a-t-il des incohérences entre feedbacks similaires ?
-
-Retourne UNIQUEMENT ce JSON valide, sans markdown :
-{{
+  ],
   "corrections": [
     {{
-      "id": <id du feedback à corriger>,
+      "id": <id du feedback corrigé>,
       "field": "category" | "priority" | "sentiment",
-      "old_value": "valeur actuelle",
+      "old_value": "valeur initiale",
       "new_value": "valeur corrigée",
       "reason": "justification en 10 mots max"
     }}
   ]
 }}
 
-Si tout est correct, retourne {{"corrections": []}}
-Ne corrige que ce qui est vraiment erroné. Sois sélectif."""
+Si aucune correction n'est nécessaire, retourne "corrections": [].
+Sois sélectif : ne signale que les corrections vraiment justifiées."""
 
         response = await self.client.aio.models.generate_content(
             model=self.model,
             contents=prompt,
         )
         data = self._parse_json_response(self._extract_text(response))
-        corrections = data.get("corrections", [])
-
-        corrected_items = [dict(item) for item in items]
-        for correction in corrections:
-            for item in corrected_items:
-                if item.get("id") == correction.get("id"):
-                    item[correction["field"]] = correction["new_value"]
-                    break
-
-        return corrected_items, corrections
+        return data.get("feedbacks", []), data.get("corrections", [])
 
     # ------------------------------------------------------------------
     # Étape 3 : Rapport exécutif

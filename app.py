@@ -115,37 +115,19 @@ async def _run_pipeline(feedbacks: list[str], agent: FeedbackTriageAgent) -> Non
     step1.output = f"**{len(feedbacks)} feedbacks** reçus et prêts à l'analyse."
     await step1.send()
 
-    # Step 2 — Catégorisation
+    # Step 2 — Catégorisation & Auto-validation (appel LLM unique)
     items: list[dict] = []
+    corrections: list[dict] = []
     categorization_error = None
-    step2 = cl.Step(name="🏷️ Catégorisation & Priorisation", type="llm")
-    step2.input = f"Analyse de {len(feedbacks)} feedbacks avec Gemini…"
+    step2 = cl.Step(name="🏷️ Catégorisation, Priorisation & Auto-validation", type="llm")
+    step2.input = f"Analyse + auto-correction de {len(feedbacks)} feedbacks avec Gemini…"
     step2.output = "⏳ En cours…"
     await step2.send()
     try:
-        items = await agent.categorize_feedbacks(feedbacks)
-        step2.output = f"✅ {len(items)} feedbacks catégorisés avec succès."
-    except Exception as e:
-        categorization_error = str(e)
-        step2.output = f"❌ Erreur : {categorization_error}"
-    await step2.update()
-
-    if categorization_error:
-        await cl.Message(
-            content=f"❌ **Erreur lors de la catégorisation**\n\n`{categorization_error}`"
-        ).send()
-        return
-
-    # Step 3 — Auto-validation
-    corrections = []
-    step3 = cl.Step(name="🔍 Auto-validation & Corrections", type="tool")
-    step3.input = "L'agent relit ses propres catégorisations…"
-    step3.output = "⏳ En cours…"
-    await step3.send()
-    try:
-        items, corrections = await agent.validate_and_correct(items)
+        items, corrections = await agent.categorize_and_validate(feedbacks)
+        lines = [f"✅ {len(items)} feedbacks catégorisés et validés."]
         if corrections:
-            lines = [f"**{len(corrections)} correction(s) effectuée(s) :**"]
+            lines.append(f"🔍 **{len(corrections)} correction(s) auto-appliquée(s) :**")
             for c in corrections:
                 field_label = {
                     "category": "catégorie",
@@ -157,14 +139,21 @@ async def _run_pipeline(feedbacks: list[str], agent: FeedbackTriageAgent) -> Non
                     f"`{c.get('old_value')}` → **{c.get('new_value')}** "
                     f"*({c.get('reason', '')})*"
                 )
-            step3.output = "\n".join(lines)
         else:
-            step3.output = "✅ Aucune correction nécessaire — catégorisations validées."
+            lines.append("🔍 Aucune correction nécessaire.")
+        step2.output = "\n".join(lines)
     except Exception as e:
-        step3.output = f"⚠️ Auto-validation ignorée : {str(e)}"
-    await step3.update()
+        categorization_error = str(e)
+        step2.output = f"❌ Erreur : {categorization_error}"
+    await step2.update()
 
-    # Step 4 — Rapport
+    if categorization_error:
+        await cl.Message(
+            content=f"❌ **Erreur lors de la catégorisation**\n\n`{categorization_error}`"
+        ).send()
+        return
+
+    # Step 3 — Rapport
     report = ""
     report_error = None
     step4 = cl.Step(name="📊 Génération du rapport exécutif", type="llm")
