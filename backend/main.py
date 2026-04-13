@@ -107,7 +107,7 @@ async def analyze_text(body: dict):
         raise HTTPException(status_code=422, detail="At least 2 feedbacks required.")
     if len(feedbacks) > 50:
         feedbacks = feedbacks[:50]
-    return EventSourceResponse(analysis_stream(feedbacks))
+    return EventSourceResponse(analysis_stream(feedbacks), headers={"X-Accel-Buffering": "no"})
 
 
 @app.post("/api/analyze/csv")
@@ -133,7 +133,7 @@ async def analyze_csv(file: UploadFile = File(...)):
     if len(feedbacks) > 50:
         feedbacks = feedbacks[:50]
 
-    return EventSourceResponse(analysis_stream(feedbacks))
+    return EventSourceResponse(analysis_stream(feedbacks), headers={"X-Accel-Buffering": "no"})
 
 
 @app.post("/api/analyze/store")
@@ -170,7 +170,7 @@ async def analyze_store(body: dict):
         async for chunk in analysis_stream(feedbacks[:50]):
             yield chunk
 
-    return EventSourceResponse(stream())
+    return EventSourceResponse(stream(), headers={"X-Accel-Buffering": "no"})
 
 
 # ------------------------------------------------------------------
