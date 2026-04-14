@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Upload, ChevronDown, ClipboardList, FileSpreadsheet, Smartphone } from "lucide-react";
+import { Upload, ChevronDown, ClipboardList, FileSpreadsheet, Star } from "lucide-react";
 import { Store, AppEntry } from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7860";
@@ -118,7 +118,7 @@ The accessibility features for VoiceOver users are exemplary`;
 const TAB_META: Record<Tab, { label: string; icon: React.ReactNode }> = {
   store: {
     label: "App Store / Google Play",
-    icon: <Smartphone className="w-4 h-4" />,
+    icon: <Star className="w-4 h-4" />,
   },
   text: {
     label: "Paste feedback",
