@@ -5,16 +5,27 @@ import InputPanel from "@/components/InputPanel";
 import FeedbackTable from "@/components/FeedbackTable";
 import ReportPanel from "@/components/ReportPanel";
 import UserStoryCards from "@/components/UserStoryCards";
-import ProgressBar from "@/components/ProgressBar";
+import AgentPipeline from "@/components/AgentPipeline";
 import { useAnalysis } from "@/lib/useAnalysis";
 import { RotateCcw } from "lucide-react";
 
 export default function Home() {
   const { step, partialItems, analyzeText, analyzeCsv, analyzeStore, reset } = useAnalysis();
   const resultsRef = useRef<HTMLDivElement>(null);
+  const pipelineMetaRef = useRef<{ scrapedCount?: number; nFeedbacks?: number }>({});
+
+  // Persist pipeline metadata across step transitions
+  if (step.type === "categorization") {
+    if (step.scrapedCount !== undefined) pipelineMetaRef.current.scrapedCount = step.scrapedCount;
+    if (step.nFeedbacks !== undefined) pipelineMetaRef.current.nFeedbacks = step.nFeedbacks;
+  }
 
   const isRunning = step.type !== "idle" && step.type !== "done" && step.type !== "error";
-  const showResults = partialItems.length > 0 || step.type === "done" || step.type === "error";
+  const showResults = partialItems.length > 0 || step.type === "categorization" || step.type === "done" || step.type === "error";
+  // Show skeleton rows while categorizing and no real results yet
+  const skeletonCount = step.type === "categorization" && partialItems.length === 0
+    ? Math.min(step.nFeedbacks ?? 10, 10)
+    : 0;
 
   useEffect(() => {
     if (showResults) {
@@ -59,10 +70,14 @@ export default function Home() {
           </section>
         )}
 
-        {/* Progress */}
-        {isRunning && (
-          <section className="flex flex-col items-center gap-6 py-8">
-            <ProgressBar step={step} />
+        {/* Agent pipeline — shown while running and when done */}
+        {(isRunning || step.type === "done") && (
+          <section className="py-4">
+            <AgentPipeline
+              step={step}
+              scrapedCount={pipelineMetaRef.current.scrapedCount}
+              nFeedbacks={pipelineMetaRef.current.nFeedbacks}
+            />
           </section>
         )}
 
@@ -77,7 +92,7 @@ export default function Home() {
         {/* Results */}
         {showResults && (
           <div ref={resultsRef} className="space-y-8">
-            {partialItems.length > 0 && (
+            {(partialItems.length > 0 || skeletonCount > 0) && (
               <section className="space-y-2">
                 <h2 className="text-sm font-medium text-gray-500">
                   Detailed results
@@ -85,7 +100,7 @@ export default function Home() {
                     <span className="ml-2 text-xs text-indigo-500 animate-pulse">Generating report…</span>
                   )}
                 </h2>
-                <FeedbackTable items={partialItems} />
+                <FeedbackTable items={partialItems} skeletonCount={skeletonCount} />
               </section>
             )}
 
