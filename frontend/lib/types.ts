@@ -18,15 +18,32 @@ export interface Correction {
   reason: string;
 }
 
-export interface UserStory {
-  title: string;
-  acceptance_criteria: string[];
+export type ActionType = "bug" | "performance" | "feature" | "ux" | "pricing" | "other";
+
+export interface RiceScore {
+  reach: number;
+  impact: 1 | 2 | 3;
+  confidence: number;
+  effort_label: "XS" | "S" | "M" | "L" | "XL";
+  effort: number;
+  score: number;
 }
 
 export interface UserStoryCard {
   action: string;
+  action_type: ActionType;
   feedbacks: string[];
-  user_stories: UserStory[];
+  rice: RiceScore;
+  // bug / performance
+  what_breaks?: string;
+  done_when?: string;
+  // feature
+  user_story?: string;
+  acceptance_criteria?: string[];
+  // ux / pricing / other + bug / performance
+  problem?: string;
+  success_metric?: string;
+  next_step?: string;
 }
 
 export interface AnalysisResult {
