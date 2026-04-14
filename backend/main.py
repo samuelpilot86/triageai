@@ -50,18 +50,28 @@ app.add_middleware(
 _TIMINGS_FILE = Path("timings.json")
 _MAX_TIMINGS = 3
 
-def _load_timings() -> list[dict]:
+# Separate history per step: {"categorization": [...], "report": [...]}
+def _load_timings() -> dict:
     try:
-        return json.loads(_TIMINGS_FILE.read_text())[-_MAX_TIMINGS:]
+        data = json.loads(_TIMINGS_FILE.read_text())
+        # Migrate old flat list format
+        if isinstance(data, list):
+            return {"categorization": data[-_MAX_TIMINGS:], "report": []}
+        return {k: v[-_MAX_TIMINGS:] for k, v in data.items()}
     except Exception:
-        return []
+        return {"categorization": [], "report": []}
 
-_timing_history: list[dict] = _load_timings()
+_timing_history: dict = _load_timings()
 
-def _save_timing(n: int, categorization_ms: int) -> None:
+def _save_timing(step: str, ms: int, n: int | None = None) -> None:
     global _timing_history
-    _timing_history.append({"n": n, "ms": categorization_ms})
-    _timing_history = _timing_history[-_MAX_TIMINGS:]
+    entry: dict = {"ms": ms}
+    if n is not None:
+        entry["n"] = n
+    if step not in _timing_history:
+        _timing_history[step] = []
+    _timing_history[step].append(entry)
+    _timing_history[step] = _timing_history[step][-_MAX_TIMINGS:]
     try:
         _TIMINGS_FILE.write_text(json.dumps(_timing_history))
     except Exception:
@@ -243,17 +253,18 @@ async def health():
 # ------------------------------------------------------------------
 
 @app.get("/api/timings")
-async def get_timings():
-    """Returns the last 3 categorization timings (shared across all users)."""
-    return {"timings": _timing_history}
+async def get_timings(step: str = Query("categorization")):
+    """Returns the last 3 timings for a given step (categorization or report)."""
+    return {"timings": _timing_history.get(step, [])}
 
 
 @app.post("/api/timings")
 async def post_timing(body: dict):
-    """Records a new categorization timing. Body: { n: int, ms: int }"""
-    n = body.get("n")
+    """Records a timing. Body: { step: str, ms: int, n?: int }"""
+    step = body.get("step", "categorization")
     ms = body.get("ms")
-    if not isinstance(n, int) or not isinstance(ms, int) or n <= 0 or ms <= 0:
-        raise HTTPException(status_code=422, detail="n and ms must be positive integers.")
-    _save_timing(n, ms)
+    n = body.get("n")
+    if not isinstance(ms, int) or ms <= 0:
+        raise HTTPException(status_code=422, detail="ms must be a positive integer.")
+    _save_timing(step, ms, n if isinstance(n, int) and n > 0 else None)
     return {"ok": True}
