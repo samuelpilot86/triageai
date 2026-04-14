@@ -11,7 +11,6 @@ from typing import AsyncGenerator
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from sse_starlette.sse import EventSourceResponse
 import pandas as pd
 
 from agent import FeedbackTriageAgent
@@ -107,7 +106,7 @@ async def analyze_text(body: dict):
         raise HTTPException(status_code=422, detail="At least 2 feedbacks required.")
     if len(feedbacks) > 50:
         feedbacks = feedbacks[:50]
-    return EventSourceResponse(analysis_stream(feedbacks), headers={"X-Accel-Buffering": "no"})
+    return StreamingResponse(analysis_stream(feedbacks), media_type="text/event-stream", headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
 
 
 @app.post("/api/analyze/csv")
@@ -133,7 +132,7 @@ async def analyze_csv(file: UploadFile = File(...)):
     if len(feedbacks) > 50:
         feedbacks = feedbacks[:50]
 
-    return EventSourceResponse(analysis_stream(feedbacks), headers={"X-Accel-Buffering": "no"})
+    return StreamingResponse(analysis_stream(feedbacks), media_type="text/event-stream", headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
 
 
 @app.post("/api/analyze/store")
@@ -170,7 +169,7 @@ async def analyze_store(body: dict):
         async for chunk in analysis_stream(feedbacks[:50]):
             yield chunk
 
-    return EventSourceResponse(stream(), headers={"X-Accel-Buffering": "no"})
+    return StreamingResponse(stream(), media_type="text/event-stream", headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
 
 
 # ------------------------------------------------------------------
