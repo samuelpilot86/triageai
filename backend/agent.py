@@ -180,13 +180,22 @@ Be selective: only flag genuinely justified corrections."""
                 FALLBACK_MODEL_MAX_TOKENS,
                 _TOKENS_OVERHEAD + n * _TOKENS_PER_FEEDBACK,
             )
-        response = await self.groq_client.chat.completions.create(
-            model=FALLBACK_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-            max_tokens=max_tokens,
-        )
-        return response.choices[0].message.content, True
+        try:
+            response = await self.groq_client.chat.completions.create(
+                model=FALLBACK_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=max_tokens,
+            )
+            return response.choices[0].message.content, True
+        except Exception as e:
+            error_str = str(e)
+            if "429" in error_str or "rate_limit" in error_str.lower():
+                raise RuntimeError(
+                    "Daily quota exhausted on both Gemini and Groq (free tiers). "
+                    "Please try again later — Groq resets every 24h, Gemini resets every minute."
+                )
+            raise
 
     # ------------------------------------------------------------------
     # Step 1: Categorization + Self-validation (single LLM call)
