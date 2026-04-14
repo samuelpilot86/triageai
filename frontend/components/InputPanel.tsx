@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Upload, ChevronDown, ClipboardList, FileSpreadsheet, Star, Zap } from "lucide-react";
+import { Upload, ChevronDown, ClipboardList, FileSpreadsheet, Star, Zap, Search, Loader2 } from "lucide-react";
 import { Store, AppEntry } from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7860";
@@ -144,6 +144,10 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
   const [selectedCategory, setSelectedCategory] = useState("");
   const [apps, setApps] = useState<AppEntry[]>([]);
   const [selectedApp, setSelectedApp] = useState<AppEntry | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<AppEntry[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Fetch categories when store changes
@@ -151,21 +155,38 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
     setSelectedCategory("");
     setSelectedApp(null);
     setApps([]);
+    setSearchQuery("");
+    setSearchResults([]);
     fetch(`${API_BASE}/api/store/categories?store=${store}`)
       .then((r) => r.json())
       .then((d) => setCategories(d.categories ?? []))
       .catch(() => {});
   }, [store]);
 
-  // Fetch apps when category changes
+  // Fetch top apps when category changes
   useEffect(() => {
-    if (!selectedCategory) return;
+    if (!selectedCategory || selectedCategory === "__other__") return;
     setSelectedApp(null);
     fetch(`${API_BASE}/api/store/apps?store=${store}&category=${encodeURIComponent(selectedCategory)}`)
       .then((r) => r.json())
       .then((d) => setApps(d.apps ?? []))
       .catch(() => {});
   }, [selectedCategory, store]);
+
+  // Debounced search when "Other" is selected
+  useEffect(() => {
+    if (selectedCategory !== "__other__") return;
+    if (!searchQuery.trim()) { setSearchResults([]); return; }
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setIsSearching(true);
+      fetch(`${API_BASE}/api/store/search?store=${store}&q=${encodeURIComponent(searchQuery)}`)
+        .then((r) => r.json())
+        .then((d) => setSearchResults(d.apps ?? []))
+        .catch(() => {})
+        .finally(() => setIsSearching(false));
+    }, 400);
+  }, [searchQuery, selectedCategory, store]);
 
   const handleFile = useCallback((file: File) => {
     if (file.name.endsWith(".csv")) setCsvFile(file);
@@ -307,15 +328,16 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
               >
                 <option value="">Select a category…</option>
                 {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                <option value="__other__">Other — search by name</option>
               </select>
               <ChevronDown className="absolute right-2 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
           </div>
 
-          {/* App dropdown */}
-          {apps.length > 0 && (
+          {/* App dropdown — top 10 or search */}
+          {selectedCategory && selectedCategory !== "__other__" && apps.length > 0 && (
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Application</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Top 10 applications</label>
               <div className="relative">
                 <select
                   value={selectedApp ? String(selectedApp.id) : ""}
@@ -327,6 +349,41 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
                 </select>
                 <ChevronDown className="absolute right-2 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" />
               </div>
+            </div>
+          )}
+
+          {/* Other — search by name */}
+          {selectedCategory === "__other__" && (
+            <div className="space-y-2">
+              <label className="block text-xs font-medium text-gray-500">Search by app name</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setSelectedApp(null); }}
+                  placeholder="e.g. Spotify, Notion, Duolingo…"
+                  className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                {isSearching && <Loader2 className="absolute right-3 top-2.5 w-4 h-4 text-gray-400 animate-spin" />}
+              </div>
+              {searchResults.length > 0 && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  {searchResults.map((a) => (
+                    <button
+                      key={String(a.id)}
+                      onClick={() => { setSelectedApp(a); setSearchQuery(a.name); setSearchResults([]); }}
+                      className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                        selectedApp?.id === a.id
+                          ? "bg-indigo-50 text-indigo-700 font-medium"
+                          : "hover:bg-gray-50 text-gray-700"
+                      }`}
+                    >
+                      {a.name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

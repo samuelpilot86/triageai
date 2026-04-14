@@ -181,6 +181,50 @@ async def fetch_googleplay_top_apps(category: str, count: int = 10) -> list[dict
 
 
 # ------------------------------------------------------------------
+# Search by name
+# ------------------------------------------------------------------
+
+async def search_googleplay_apps(query: str, count: int = 8) -> list[dict]:
+    """Search Google Play apps by name/keyword."""
+    if not GOOGLE_PLAY_AVAILABLE:
+        return []
+    loop = asyncio.get_event_loop()
+    try:
+        results = await loop.run_in_executor(
+            None,
+            lambda: gp_search(query, n_hits=count, lang="en", country="us"),
+        )
+        return [
+            {"id": r["appId"], "name": r["title"], "store": "googleplay"}
+            for r in results[:count]
+        ]
+    except Exception:
+        return []
+
+
+async def search_appstore_apps(query: str, count: int = 8) -> list[dict]:
+    """Search App Store apps by name/keyword via iTunes Search API."""
+    loop = asyncio.get_event_loop()
+    try:
+        url = (
+            f"https://itunes.apple.com/search"
+            f"?term={requests.utils.quote(query)}&entity=software&limit={count}&country=us"
+        )
+        response = await loop.run_in_executor(
+            None,
+            lambda: requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"}),
+        )
+        response.raise_for_status()
+        results = response.json().get("results", [])
+        return [
+            {"id": str(r["trackId"]), "name": r["trackName"], "store": "appstore"}
+            for r in results[:count]
+        ]
+    except Exception:
+        return []
+
+
+# ------------------------------------------------------------------
 # Review fetchers
 # ------------------------------------------------------------------
 
