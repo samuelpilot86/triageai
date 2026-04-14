@@ -274,9 +274,9 @@ export default function AgentPipeline({
   scrapedCount?: number;
   nFeedbacks?: number;
 }) {
-  const isScraping =
-    step.type === "scraping" ||
-    (step.type === "categorization" && scrapedCount !== undefined);
+  // isScraping is true as soon as scrapedCount is set (persisted by pipelineMetaRef in page.tsx),
+  // OR while the scraping step is active — so Webb stays visible through the entire analysis.
+  const isScraping = scrapedCount !== undefined || step.type === "scraping";
 
   const statuses = deriveStatuses(step, isScraping);
 
