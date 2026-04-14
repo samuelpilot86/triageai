@@ -110,8 +110,11 @@ Return ONLY valid JSON, no markdown, no surrounding text:
   ]
 }}
 
-If no corrections are needed, return "corrections": [].
-Be selective: only flag genuinely justified corrections."""
+IMPORTANT RULES FOR CORRECTIONS:
+- Only include a correction when old_value and new_value are DIFFERENT.
+- Never list a correction just to confirm a decision was correct.
+- If a field needed no change, do NOT include it in corrections at all.
+- If no fields needed changing, return "corrections": []."""
 
     async def _categorize_chunked(
         self, feedbacks: list[str], chunk_size: int
@@ -132,7 +135,10 @@ Be selective: only flag genuinely justified corrections."""
             )
             data = self._parse_json_response(text)
             chunk_items = data.get("feedbacks", [])
-            chunk_corrections = data.get("corrections", [])
+            chunk_corrections = [
+                c for c in data.get("corrections", [])
+                if c.get("old_value") != c.get("new_value")
+            ]
 
             # Re-sequence IDs globally across chunks
             for item in chunk_items:
@@ -214,7 +220,11 @@ Be selective: only flag genuinely justified corrections."""
         try:
             text, used_fallback = await self._call_llm(prompt, n_feedbacks=len(feedbacks))
             data = self._parse_json_response(text)
-            return data.get("feedbacks", []), data.get("corrections", []), used_fallback
+            corrections = [
+                c for c in data.get("corrections", [])
+                if c.get("old_value") != c.get("new_value")
+            ]
+            return data.get("feedbacks", []), corrections, used_fallback
         except Exception as e:
             error_str = str(e)
             is_quota = (
