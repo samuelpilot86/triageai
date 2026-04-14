@@ -347,7 +347,7 @@ Return ONLY valid JSON, no markdown, no surrounding text:
 
 Rules:
 - Use verbatim quotes from the "original" field — do not paraphrase
-- STRICT RELEVANCE: only include a quote if it explicitly mentions the specific issue addressed by the action (e.g. for a loading/performance action, only quotes that mention loading, crashing, lag, or speed — NOT generic negative reviews)
+- STRICT RELEVANCE: only include a quote if its content is directly and specifically about the issue this action addresses — NOT generic praise or complaints that could apply to any problem
 - If fewer than 2 quotes are relevant, include only the relevant ones — do not pad with loosely related feedbacks
 - User story titles must be specific and actionable, not generic
 - Acceptance criteria must be testable (Given/When/Then format preferred)
