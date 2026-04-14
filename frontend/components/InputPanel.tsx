@@ -144,6 +144,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
   const [selectedCategory, setSelectedCategory] = useState("");
   const [apps, setApps] = useState<AppEntry[]>([]);
   const [selectedApp, setSelectedApp] = useState<AppEntry | null>(null);
+  const [appIsOther, setAppIsOther] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<AppEntry[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -155,6 +156,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
     setSelectedCategory("");
     setSelectedApp(null);
     setApps([]);
+    setAppIsOther(false);
     setSearchQuery("");
     setSearchResults([]);
     fetch(`${API_BASE}/api/store/categories?store=${store}`)
@@ -165,17 +167,20 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
 
   // Fetch top apps when category changes
   useEffect(() => {
-    if (!selectedCategory || selectedCategory === "__other__") return;
+    if (!selectedCategory) return;
     setSelectedApp(null);
+    setAppIsOther(false);
+    setSearchQuery("");
+    setSearchResults([]);
     fetch(`${API_BASE}/api/store/apps?store=${store}&category=${encodeURIComponent(selectedCategory)}`)
       .then((r) => r.json())
       .then((d) => setApps(d.apps ?? []))
       .catch(() => {});
   }, [selectedCategory, store]);
 
-  // Debounced search when "Other" is selected
+  // Debounced search when "Other" is selected in app dropdown
   useEffect(() => {
-    if (selectedCategory !== "__other__") return;
+    if (!appIsOther) return;
     if (!searchQuery.trim()) { setSearchResults([]); return; }
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => {
@@ -186,7 +191,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
         .catch(() => {})
         .finally(() => setIsSearching(false));
     }, 400);
-  }, [searchQuery, selectedCategory, store]);
+  }, [searchQuery, appIsOther, store]);
 
   const handleFile = useCallback((file: File) => {
     if (file.name.endsWith(".csv")) setCsvFile(file);
@@ -328,24 +333,31 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
               >
                 <option value="">Select a category…</option>
                 {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-                <option value="__other__">Other — search by name</option>
               </select>
               <ChevronDown className="absolute right-2 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
           </div>
 
-          {/* App dropdown — top 10 or search */}
-          {selectedCategory && selectedCategory !== "__other__" && apps.length > 0 && (
+          {/* App dropdown — top 10 + Other */}
+          {selectedCategory && apps.length > 0 && !appIsOther && (
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Top 10 applications</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">App</label>
               <div className="relative">
                 <select
                   value={selectedApp ? String(selectedApp.id) : ""}
-                  onChange={(e) => setSelectedApp(apps.find((a) => String(a.id) === e.target.value) ?? null)}
+                  onChange={(e) => {
+                    if (e.target.value === "__other__") {
+                      setAppIsOther(true);
+                      setSelectedApp(null);
+                    } else {
+                      setSelectedApp(apps.find((a) => String(a.id) === e.target.value) ?? null);
+                    }
+                  }}
                   className="w-full appearance-none px-3 py-2 pr-8 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="">Select an app…</option>
                   {apps.map((a) => <option key={String(a.id)} value={String(a.id)}>{a.name}</option>)}
+                  <option value="__other__">Other — search by name…</option>
                 </select>
                 <ChevronDown className="absolute right-2 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" />
               </div>
@@ -353,9 +365,12 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
           )}
 
           {/* Other — search by name */}
-          {selectedCategory === "__other__" && (
+          {appIsOther && (
             <div className="space-y-2">
-              <label className="block text-xs font-medium text-gray-500">Search by app name</label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-medium text-gray-500">Search by app name</label>
+                <button onClick={() => { setAppIsOther(false); setSearchQuery(""); setSearchResults([]); }} className="text-xs text-gray-400 hover:text-gray-600">← Back to top 10</button>
+              </div>
               <div className="relative">
                 <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" />
                 <input
@@ -364,6 +379,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
                   onChange={(e) => { setSearchQuery(e.target.value); setSelectedApp(null); }}
                   placeholder="e.g. Spotify, Notion, Duolingo…"
                   className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  autoFocus
                 />
                 {isSearching && <Loader2 className="absolute right-3 top-2.5 w-4 h-4 text-gray-400 animate-spin" />}
               </div>
