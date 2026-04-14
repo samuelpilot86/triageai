@@ -23,6 +23,8 @@ from scraper import (
     fetch_app_store_reviews,
     fetch_appstore_top_apps,
     fetch_googleplay_top_apps,
+    search_appstore_apps,
+    search_googleplay_apps,
 )
 
 # ------------------------------------------------------------------
@@ -240,6 +242,18 @@ async def get_apps(store: str = Query("googleplay"), category: str = Query(...))
         apps = await fetch_googleplay_top_apps(category, count=10)
     else:
         apps = await fetch_appstore_top_apps(category, count=10)
+    return {"apps": apps}
+
+
+@app.get("/api/store/search")
+async def search_apps(store: str = Query("googleplay"), q: str = Query(...)):
+    """Search apps by name/keyword across Google Play or App Store."""
+    if not q.strip():
+        return {"apps": []}
+    if store == "googleplay":
+        apps = await search_googleplay_apps(q.strip(), count=8)
+    else:
+        apps = await search_appstore_apps(q.strip(), count=8)
     return {"apps": apps}
 
 
