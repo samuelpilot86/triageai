@@ -56,8 +56,14 @@ export default function Home() {
       <main className="max-w-4xl mx-auto px-6 py-10 space-y-10">
         {/* Input section — hidden when running or done */}
         {step.type === "idle" && (
-          <section className="space-y-2">
-            <h2 className="text-sm font-medium text-gray-500">Input</h2>
+          <section className="space-y-6">
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-gray-900">Triage your app reviews in seconds</h2>
+              <p className="text-sm text-gray-500 max-w-xl">
+                Paste feedback, upload a CSV, or pull directly from the App Store or Google Play.
+                Your AI agents will categorize, prioritize, and turn them into sprint-ready cards.
+              </p>
+            </div>
             <div className="bg-white rounded-2xl border border-gray-200 p-6">
               <InputPanel
                 onAnalyzeText={analyzeText}
