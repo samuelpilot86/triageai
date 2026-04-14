@@ -6,6 +6,8 @@ Exposes SSE streaming for analysis + REST endpoints for store data.
 import os
 import json
 import asyncio
+import time
+from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query
@@ -40,6 +42,31 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ------------------------------------------------------------------
+# Timing history (shared across all users, persisted to file)
+# ------------------------------------------------------------------
+
+_TIMINGS_FILE = Path("timings.json")
+_MAX_TIMINGS = 3
+
+def _load_timings() -> list[dict]:
+    try:
+        return json.loads(_TIMINGS_FILE.read_text())[-_MAX_TIMINGS:]
+    except Exception:
+        return []
+
+_timing_history: list[dict] = _load_timings()
+
+def _save_timing(n: int, categorization_ms: int) -> None:
+    global _timing_history
+    _timing_history.append({"n": n, "ms": categorization_ms})
+    _timing_history = _timing_history[-_MAX_TIMINGS:]
+    try:
+        _TIMINGS_FILE.write_text(json.dumps(_timing_history))
+    except Exception:
+        pass
+
 
 # ------------------------------------------------------------------
 # Agent factory
@@ -209,3 +236,24 @@ async def get_apps(store: str = Query("googleplay"), category: str = Query(...))
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+# ------------------------------------------------------------------
+# Timing history endpoints
+# ------------------------------------------------------------------
+
+@app.get("/api/timings")
+async def get_timings():
+    """Returns the last 3 categorization timings (shared across all users)."""
+    return {"timings": _timing_history}
+
+
+@app.post("/api/timings")
+async def post_timing(body: dict):
+    """Records a new categorization timing. Body: { n: int, ms: int }"""
+    n = body.get("n")
+    ms = body.get("ms")
+    if not isinstance(n, int) or not isinstance(ms, int) or n <= 0 or ms <= 0:
+        raise HTTPException(status_code=422, detail="n and ms must be positive integers.")
+    _save_timing(n, ms)
+    return {"ok": True}

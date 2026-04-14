@@ -24,8 +24,33 @@ const CATEGORY_EMOJI: Record<string, string> = {
   Other: "📌",
 };
 
-export default function FeedbackTable({ items }: { items: FeedbackItem[] }) {
-  if (!items.length) return null;
+function SkeletonRow({ index }: { index: number }) {
+  // Vary widths slightly so rows look natural, not copy-pasted
+  const widths = ["w-24", "w-20", "w-28", "w-16", "w-32", "w-14"];
+  const w = widths[index % widths.length];
+  return (
+    <tr className="animate-pulse">
+      <td className="px-4 py-3"><div className="h-3 w-4 bg-gray-200 rounded" /></td>
+      <td className="px-4 py-3 space-y-1.5">
+        <div className={`h-3 ${w} bg-gray-200 rounded`} />
+        <div className="h-2 w-40 bg-gray-100 rounded" />
+      </td>
+      <td className="px-4 py-3"><div className="h-3 w-24 bg-gray-200 rounded" /></td>
+      <td className="px-4 py-3"><div className="h-5 w-14 bg-gray-200 rounded-full" /></td>
+      <td className="px-4 py-3"><div className="h-2 w-28 bg-gray-100 rounded" /></td>
+      <td className="px-4 py-3"><div className="h-5 w-16 bg-gray-200 rounded-full" /></td>
+    </tr>
+  );
+}
+
+export default function FeedbackTable({
+  items,
+  skeletonCount = 0,
+}: {
+  items: FeedbackItem[];
+  skeletonCount?: number;
+}) {
+  if (!items.length && skeletonCount === 0) return null;
 
   return (
     <div className="w-full overflow-x-auto rounded-xl border border-gray-200">
@@ -65,6 +90,9 @@ export default function FeedbackTable({ items }: { items: FeedbackItem[] }) {
                 </span>
               </td>
             </tr>
+          ))}
+          {Array.from({ length: skeletonCount }).map((_, i) => (
+            <SkeletonRow key={`skel-${i}`} index={i} />
           ))}
         </tbody>
       </table>
