@@ -77,6 +77,10 @@ For each feedback, determine:
   * Low    = cosmetic improvement or edge case
 - priority_reason : justification in 10 words or fewer
 - sentiment   : "Positive", "Neutral" or "Negative"
+- actionable  : true if the feedback contains specific, identifiable product information
+                (a concrete bug, a precise feature request, a reproducible UX issue, etc.)
+                false if it is purely emotional, generic, or contains no actionable product signal
+                (e.g. "worst app ever", "I hate this", "dumbest ai" with no further detail)
 
 ═══ PHASE 2 — SELF-CORRECTION ═══
 Review your own decisions critically:
@@ -96,7 +100,8 @@ Return ONLY valid JSON, no markdown, no surrounding text:
       "category": "...",
       "priority": "...",
       "priority_reason": "...",
-      "sentiment": "..."
+      "sentiment": "...",
+      "actionable": true
     }}
   ],
   "corrections": [
@@ -308,7 +313,10 @@ Rules for report content:
         Returns (cards, used_fallback).
         """
         df = pd.DataFrame(items)
-        high_medium = df[df["priority"].isin(["High", "Medium"])][
+        mask = df["priority"].isin(["High", "Medium"])
+        if "actionable" in df.columns:
+            mask = mask & (df["actionable"] != False)  # noqa: E712
+        high_medium = df[mask][
             ["original", "summary", "category", "priority"]
         ].to_dict(orient="records")
 
@@ -325,12 +333,15 @@ HIGH/MEDIUM PRIORITY USER FEEDBACKS (total analyzed: {len(items)}):
 
 For each action, produce a card following these steps:
 
-STEP 1 — Detect action_type: "bug" | "performance" | "feature" | "ux" | "pricing" | "other"
+STEP 1 — Detect action_type: "bug" | "performance" | "feature" | "ux" | "pricing" | "ai_quality" | "other"
+  Use "ai_quality" when the action addresses the quality, tone, accuracy, or relevance of AI-generated responses.
 
 STEP 2 — Select 2–4 quotes STRICTLY relevant to this action's specific topic.
 STRICT RELEVANCE: only include a quote if its content directly and specifically addresses this action.
 Never include generic complaints or praise that could apply to any issue.
 If fewer than 2 quotes qualify, include only those that do.
+For each selected quote, detect its language. If it is NOT English, add an "translation" field
+with a concise English translation. If it IS English, omit the "translation" field entirely.
 
 STEP 3 — Estimate RICE:
 - reach: integer count of feedbacks (from the full list above) that directly mention this issue
@@ -350,7 +361,10 @@ Return ONLY a valid JSON array, no markdown, no surrounding text:
   {{
     "action": "exact action title verbatim",
     "action_type": "bug",
-    "feedbacks": ["verbatim quote 1", "verbatim quote 2"],
+    "feedbacks": [
+      {{"text": "verbatim quote in original language", "translation": "English translation if not English"}},
+      {{"text": "verbatim English quote"}}
+    ],
     "rice": {{
       "reach": 12,
       "impact": 3,
@@ -368,6 +382,7 @@ Return ONLY a valid JSON array, no markdown, no surrounding text:
     "action_type": "feature",
     "feedbacks": ["verbatim quote 1", "verbatim quote 2"],
     "rice": {{ "reach": 6, "impact": 2, "confidence": 0.7, "effort_label": "L", "effort": 4, "score": 21 }},
+    "feedbacks": [{{"text": "verbatim quote"}}],
     "user_story": "As a [user type], I want [specific thing] so that [concrete benefit]",
     "acceptance_criteria": [
       "Given [context], when [action], then [expected result]",
@@ -379,6 +394,7 @@ Return ONLY a valid JSON array, no markdown, no surrounding text:
     "action_type": "ux",
     "feedbacks": ["verbatim quote 1"],
     "rice": {{ "reach": 5, "impact": 2, "confidence": 0.6, "effort_label": "S", "effort": 1, "score": 60 }},
+    "feedbacks": [{{"text": "verbatim quote"}}],
     "problem": "Clear problem statement from the user's perspective",
     "success_metric": "How you will measure that this is resolved",
     "next_step": "Concrete first action (design, A/B test, research, etc.)"
