@@ -81,7 +81,7 @@ async def analysis_stream(feedbacks: list[str]) -> AsyncGenerator[str, None]:
     yield sse_event("status", {"step": "report", "message": "Generating executive report…"})
 
     try:
-        report, report_fallback = await agent.generate_report(items)
+        report, actions, report_fallback = await agent.generate_report(items)
     except Exception as e:
         yield sse_event("error", {"message": str(e)})
         return
@@ -90,6 +90,17 @@ async def analysis_stream(feedbacks: list[str]) -> AsyncGenerator[str, None]:
         "text": report,
         "used_fallback": report_fallback,
     })
+
+    if actions:
+        yield sse_event("status", {"step": "report", "message": "Generating user story cards…"})
+        try:
+            cards, cards_fallback = await agent.generate_user_stories(items, actions)
+            yield sse_event("user_stories", {
+                "cards": cards,
+                "used_fallback": cards_fallback,
+            })
+        except Exception:
+            pass  # user stories are non-blocking — report is already shown
 
     yield sse_event("done", {})
 

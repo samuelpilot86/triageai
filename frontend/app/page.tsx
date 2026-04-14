@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import InputPanel from "@/components/InputPanel";
 import FeedbackTable from "@/components/FeedbackTable";
 import ReportPanel from "@/components/ReportPanel";
+import UserStoryCards from "@/components/UserStoryCards";
 import ProgressBar from "@/components/ProgressBar";
 import { useAnalysis } from "@/lib/useAnalysis";
 import { RotateCcw } from "lucide-react";
@@ -89,8 +90,11 @@ export default function Home() {
             )}
 
             {step.type === "done" && (
-              <section>
+              <section className="space-y-8">
                 <ReportPanel result={step.result} />
+                {step.result.user_story_cards.length > 0 && (
+                  <UserStoryCards cards={step.result.user_story_cards} />
+                )}
               </section>
             )}
           </div>

@@ -265,29 +265,96 @@ OVERVIEW:
 ISSUE BREAKDOWN (High + Medium priority, grouped by theme):
 {json.dumps(issue_clusters, ensure_ascii=False, indent=2)}
 
-Generate the report using EXACTLY this markdown structure:
+Return ONLY valid JSON (no markdown, no surrounding text) with this exact structure:
+{{
+  "report": "## Summary\\n[2-3 sentences on overall product health, referencing dominant issue themes specifically.]\\n\\n## Top 3 Recommended Actions\\n1. **[Action title: verb + specific component/flow]** — [What breaks, how many users, impact on retention]\\n2. **[same format]** — [same detail]\\n3. **[same format]** — [same detail]\\n\\n## Weak Signal to Watch\\n[1 non-obvious insight]",
+  "actions": ["exact action title 1", "exact action title 2", "exact action title 3"]
+}}
 
-## Summary
-[2-3 sentences on the overall product health, referencing the dominant issue themes specifically.]
+Rules for report content:
+- Action titles: name the specific feature/flow (e.g. "Fix appointment date picker crash on iOS" not "fix bugs")
+- If multiple distinct issues share a category, pick the most impactful — mention others in justification
+- Include counts/percentages to justify prioritization
+- Actions must be specific enough to copy directly as a sprint backlog ticket title
+- Tone: senior product consultant, concise, decision-oriented
+- The "actions" array must contain EXACTLY the bold titles from ## Top 3 Recommended Actions, verbatim"""
 
-## Top 3 Recommended Actions
-1. **[Action title: verb + specific component/flow, e.g. "Fix appointment filter returning empty results"]** — [What exactly breaks, how many users reported it, direct impact on retention or conversion]
-2. **[Action title: same format]** — [Same detail level]
-3. **[Action title: same format]** — [Same detail level]
+        text, used_fallback = await self._call_llm(prompt, max_tokens=2500)
+        try:
+            parsed = self._parse_json_response(text)
+            report_md = parsed.get("report", text)
+            actions = parsed.get("actions", [])
+        except Exception:
+            report_md = text
+            actions = []
+        return report_md, actions, used_fallback
 
-## Weak Signal to Watch
-[1 non-obvious insight — a low-frequency issue that could become critical, or an unexpected pattern in the data]
+    async def generate_user_stories(
+        self, items: list[dict], actions: list[str]
+    ) -> tuple[list[dict], bool]:
+        """
+        Generates Key User Feedback cards for each of the 3 recommended actions.
+        Returns (cards, used_fallback).
+        Each card: {action, feedbacks: [str], user_stories: [{title, acceptance_criteria: [str]}]}
+        """
+        df = pd.DataFrame(items)
+        high_medium = df[df["priority"].isin(["High", "Medium"])][
+            ["original", "summary", "category", "priority"]
+        ].to_dict(orient="records")
+
+        actions_str = "\n".join(f"{i+1}. {a}" for i, a in enumerate(actions))
+        feedbacks_str = json.dumps(high_medium, ensure_ascii=False, indent=2)
+
+        prompt = f"""You are a senior Product Manager writing user story cards for a sprint backlog.
+
+THE 3 RECOMMENDED ACTIONS:
+{actions_str}
+
+HIGH/MEDIUM PRIORITY USER FEEDBACKS:
+{feedbacks_str}
+
+For each action, produce a structured card containing:
+1. The exact action title (verbatim from the list above)
+2. The 3–5 user feedback quotes (use "original" field) that most directly justify this action
+3. 1–2 user stories in the format "As a [user type], I want [specific feature/fix] so that [concrete benefit]", each with 2–4 acceptance criteria
+
+Return ONLY valid JSON, no markdown, no surrounding text:
+[
+  {{
+    "action": "exact action title",
+    "feedbacks": ["original quote 1", "original quote 2", "original quote 3"],
+    "user_stories": [
+      {{
+        "title": "As a [user type], I want [X] so that [Y]",
+        "acceptance_criteria": [
+          "Given [context], when [action], then [expected result]",
+          "..."
+        ]
+      }}
+    ]
+  }}
+]
 
 Rules:
-- Each action title must name the specific feature or flow affected, not the category (write "fix appointment date picker crash on iOS" not "fix bugs")
-- If multiple distinct issues fall in the same category, pick the single most impactful one for the action — mention the others in the justification
-- Include counts/percentages to justify prioritization
-- Actions must be specific enough to copy directly into a sprint backlog as a ticket title
-- Tone: senior product consultant, concise, decision-oriented"""
+- Use verbatim quotes from the "original" field — do not paraphrase
+- User story titles must be specific and actionable, not generic
+- Acceptance criteria must be testable (Given/When/Then format preferred)
+- Each card must have at least 1 user story, at most 2"""
 
-        # Report output is always short (~800-1200 tokens), regardless of input size
-        text, used_fallback = await self._call_llm(prompt, max_tokens=2048)
-        return text, used_fallback
+        text, used_fallback = await self._call_llm(prompt, max_tokens=3000)
+        try:
+            cards = json.loads(self._parse_json_response(text).__class__.__name__ and text.strip())
+            if not isinstance(cards, list):
+                raise ValueError
+        except Exception:
+            try:
+                # _parse_json_response expects a dict, handle list directly
+                clean = re.sub(r"```(?:json)?\s*\n?", "", text)
+                clean = re.sub(r"\n?```", "", clean).strip()
+                cards = json.loads(clean)
+            except Exception:
+                cards = []
+        return cards, used_fallback
 
     # ------------------------------------------------------------------
     # Utilities

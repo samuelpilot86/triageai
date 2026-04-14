@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { AnalysisStep, AnalysisResult, FeedbackItem, Correction, Store, AppEntry } from "./types";
+import { AnalysisStep, AnalysisResult, FeedbackItem, Correction, Store, AppEntry, UserStoryCard } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7860";
 
@@ -64,13 +64,26 @@ export function useAnalysis() {
   const [partialItems, setPartialItems] = useState<FeedbackItem[]>([]);
   const correctionsRef = useRef<Correction[]>([]);
   const usedFallbackRef = useRef<boolean>(false);
+  const reportRef = useRef<{ text: string; fallback: boolean } | null>(null);
+  const userStoryCardsRef = useRef<UserStoryCard[]>([]);
 
   const reset = useCallback(() => {
     setStep({ type: "idle" });
     setPartialItems([]);
     correctionsRef.current = [];
     usedFallbackRef.current = false;
+    reportRef.current = null;
+    userStoryCardsRef.current = [];
   }, []);
+
+  const buildResult = useCallback((items: FeedbackItem[]): AnalysisResult => ({
+    items,
+    corrections: correctionsRef.current,
+    used_fallback: usedFallbackRef.current,
+    report: reportRef.current?.text ?? "",
+    report_fallback: reportRef.current?.fallback ?? false,
+    user_story_cards: userStoryCardsRef.current,
+  }), []);
 
   const handleEvents = useCallback((event: string, data: unknown) => {
     const d = data as Record<string, unknown>;
@@ -86,21 +99,26 @@ export function useAnalysis() {
       correctionsRef.current = (d.corrections as Correction[]) ?? [];
       usedFallbackRef.current = (d.used_fallback as boolean) ?? false;
     } else if (event === "report") {
+      reportRef.current = {
+        text: d.text as string,
+        fallback: d.used_fallback as boolean,
+      };
+      // Show results immediately — user_stories will update when it arrives
       setPartialItems((items) => {
-        const result: AnalysisResult = {
-          items,
-          corrections: correctionsRef.current,
-          used_fallback: usedFallbackRef.current,
-          report: d.text as string,
-          report_fallback: d.used_fallback as boolean,
-        };
-        setStep({ type: "done", result });
+        setStep({ type: "done", result: buildResult(items) });
+        return items;
+      });
+    } else if (event === "user_stories") {
+      userStoryCardsRef.current = (d.cards as UserStoryCard[]) ?? [];
+      // Update done state with cards
+      setPartialItems((items) => {
+        setStep({ type: "done", result: buildResult(items) });
         return items;
       });
     } else if (event === "error") {
       setStep({ type: "error", message: d.message as string });
     }
-  }, []);
+  }, [buildResult]);
 
   const analyzeText = useCallback((feedbacks: string[]) => {
     setStep({ type: "categorization" });

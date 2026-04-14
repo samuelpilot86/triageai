@@ -18,12 +18,24 @@ export interface Correction {
   reason: string;
 }
 
+export interface UserStory {
+  title: string;
+  acceptance_criteria: string[];
+}
+
+export interface UserStoryCard {
+  action: string;
+  feedbacks: string[];
+  user_stories: UserStory[];
+}
+
 export interface AnalysisResult {
   items: FeedbackItem[];
   corrections: Correction[];
   used_fallback: boolean;
   report: string;
   report_fallback: boolean;
+  user_story_cards: UserStoryCard[];
 }
 
 export type AnalysisStep =
