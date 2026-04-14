@@ -303,9 +303,9 @@ Rules for report content:
         self, items: list[dict], actions: list[str]
     ) -> tuple[list[dict], bool]:
         """
-        Generates Key User Feedback cards for each of the 3 recommended actions.
+        Generates actionable sprint cards for each of the 3 recommended actions.
+        Format adapts to action type (bug, feature, ux, etc.) and includes RICE scoring.
         Returns (cards, used_fallback).
-        Each card: {action, feedbacks: [str], user_stories: [{title, acceptance_criteria: [str]}]}
         """
         df = pd.DataFrame(items)
         high_medium = df[df["priority"].isin(["High", "Medium"])][
@@ -315,57 +315,87 @@ Rules for report content:
         actions_str = "\n".join(f"{i+1}. {a}" for i, a in enumerate(actions))
         feedbacks_str = json.dumps(high_medium, ensure_ascii=False, indent=2)
 
-        prompt = f"""You are a senior Product Manager writing user story cards for a sprint backlog.
+        prompt = f"""You are a senior Product Manager writing actionable sprint cards.
 
 THE 3 RECOMMENDED ACTIONS:
 {actions_str}
 
-HIGH/MEDIUM PRIORITY USER FEEDBACKS:
+HIGH/MEDIUM PRIORITY USER FEEDBACKS (total analyzed: {len(items)}):
 {feedbacks_str}
 
-For each action, produce a structured card containing:
-1. The exact action title (verbatim from the list above)
-2. 2–4 user feedback quotes that are DIRECTLY and SPECIFICALLY about this action's topic
-3. 1–2 user stories in the format "As a [user type], I want [specific feature/fix] so that [concrete benefit]", each with 2–4 acceptance criteria
+For each action, produce a card following these steps:
 
-Return ONLY valid JSON, no markdown, no surrounding text:
+STEP 1 — Detect action_type: "bug" | "performance" | "feature" | "ux" | "pricing" | "other"
+
+STEP 2 — Select 2–4 quotes STRICTLY relevant to this action's specific topic.
+STRICT RELEVANCE: only include a quote if its content directly and specifically addresses this action.
+Never include generic complaints or praise that could apply to any issue.
+If fewer than 2 quotes qualify, include only those that do.
+
+STEP 3 — Estimate RICE:
+- reach: integer count of feedbacks (from the full list above) that directly mention this issue
+- impact: 1=low friction | 2=significant friction or churn risk | 3=blocking or critical
+- confidence: 0.2 to 1.0 (higher when many consistent signals, lower when few or ambiguous)
+- effort_label: "XS" (hours) | "S" (days) | "M" (1–2 sprints) | "L" (3–4 sprints) | "XL" (quarter+)
+- effort: XS=0.5, S=1, M=2, L=4, XL=8
+- score: integer, formula = round((reach * impact * confidence / effort) * 10)
+
+STEP 4 — Fill the template matching action_type:
+- bug or performance → provide: what_breaks, done_when, next_step
+- feature → provide: user_story ("As a [type], I want [X] so that [Y]"), acceptance_criteria (2–4 testable Given/When/Then strings)
+- ux, pricing, other → provide: problem, success_metric, next_step
+
+Return ONLY a valid JSON array, no markdown, no surrounding text:
 [
   {{
-    "action": "exact action title",
-    "feedbacks": ["original quote 1", "original quote 2"],
-    "user_stories": [
-      {{
-        "title": "As a [user type], I want [X] so that [Y]",
-        "acceptance_criteria": [
-          "Given [context], when [action], then [expected result]",
-          "..."
-        ]
-      }}
+    "action": "exact action title verbatim",
+    "action_type": "bug",
+    "feedbacks": ["verbatim quote 1", "verbatim quote 2"],
+    "rice": {{
+      "reach": 12,
+      "impact": 3,
+      "confidence": 0.8,
+      "effort_label": "M",
+      "effort": 2,
+      "score": 144
+    }},
+    "what_breaks": "Concise description of what fails and when",
+    "done_when": "Observable, testable completion criteria",
+    "next_step": "Concrete first engineering or design action"
+  }},
+  {{
+    "action": "exact action title verbatim",
+    "action_type": "feature",
+    "feedbacks": ["verbatim quote 1", "verbatim quote 2"],
+    "rice": {{ "reach": 6, "impact": 2, "confidence": 0.7, "effort_label": "L", "effort": 4, "score": 21 }},
+    "user_story": "As a [user type], I want [specific thing] so that [concrete benefit]",
+    "acceptance_criteria": [
+      "Given [context], when [action], then [expected result]",
+      "Given [context], when [action], then [expected result]"
     ]
+  }},
+  {{
+    "action": "exact action title verbatim",
+    "action_type": "ux",
+    "feedbacks": ["verbatim quote 1"],
+    "rice": {{ "reach": 5, "impact": 2, "confidence": 0.6, "effort_label": "S", "effort": 1, "score": 60 }},
+    "problem": "Clear problem statement from the user's perspective",
+    "success_metric": "How you will measure that this is resolved",
+    "next_step": "Concrete first action (design, A/B test, research, etc.)"
   }}
-]
-
-Rules:
-- Use verbatim quotes from the "original" field — do not paraphrase
-- STRICT RELEVANCE: only include a quote if its content is directly and specifically about the issue this action addresses — NOT generic praise or complaints that could apply to any problem
-- If fewer than 2 quotes are relevant, include only the relevant ones — do not pad with loosely related feedbacks
-- User story titles must be specific and actionable, not generic
-- Acceptance criteria must be testable (Given/When/Then format preferred)
-- Each card must have at least 1 user story, at most 2"""
+]"""
 
         text, used_fallback = await self._call_llm(prompt, max_tokens=3000)
         try:
-            cards = json.loads(self._parse_json_response(text).__class__.__name__ and text.strip())
+            clean = re.sub(r"```(?:json)?\s*\n?", "", text)
+            clean = re.sub(r"\n?```", "", clean).strip()
+            cards = json.loads(clean)
             if not isinstance(cards, list):
                 raise ValueError
+            # Sort by RICE score descending
+            cards.sort(key=lambda c: c.get("rice", {}).get("score", 0), reverse=True)
         except Exception:
-            try:
-                # _parse_json_response expects a dict, handle list directly
-                clean = re.sub(r"```(?:json)?\s*\n?", "", text)
-                clean = re.sub(r"\n?```", "", clean).strip()
-                cards = json.loads(clean)
-            except Exception:
-                cards = []
+            cards = []
         return cards, used_fallback
 
     # ------------------------------------------------------------------
