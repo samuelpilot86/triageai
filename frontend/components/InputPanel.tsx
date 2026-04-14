@@ -191,9 +191,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
             }`}
           >
             {TAB_META[t].icon}
-            <span className={t === "text" ? "line-through opacity-50" : ""}>
-              {TAB_META[t].label}
-            </span>
+            {TAB_META[t].label}
           </button>
         ))}
       </div>
