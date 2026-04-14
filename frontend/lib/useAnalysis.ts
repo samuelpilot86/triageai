@@ -46,7 +46,13 @@ function streamEvents(
         }
       }
     } catch (e) {
-      if (!cancelled) onError(e as Error);
+      if (!cancelled) {
+        const msg = (e instanceof Error)
+          ? `${e.name}: ${e.message || "(no message)"} — stack: ${e.stack?.split("\n")[1] ?? ""}`
+          : String(e);
+        console.error("[trIAge SSE error]", msg, e);
+        onError(new Error(msg));
+      }
     }
   })();
 
