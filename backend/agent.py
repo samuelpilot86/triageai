@@ -366,17 +366,10 @@ Return ONLY a valid JSON array, no markdown, no surrounding text:
     "action": "exact action title verbatim",
     "action_type": "bug",
     "feedbacks": [
-      {{"text": "verbatim quote in original language", "translation": "English translation if not English"}},
+      {{"text": "verbatim quote in original language", "translation": "English translation"}},
       {{"text": "verbatim English quote"}}
     ],
-    "rice": {{
-      "reach": 12,
-      "impact": 3,
-      "confidence": 0.8,
-      "effort_label": "M",
-      "effort": 2,
-      "score": 144
-    }},
+    "rice": {{"reach": 12, "impact": 3, "confidence": 0.8, "effort_label": "M", "effort": 2, "score": 144}},
     "what_breaks": "Concise description of what fails and when",
     "done_when": "Observable, testable completion criteria",
     "next_step": "Concrete first engineering or design action"
@@ -384,9 +377,10 @@ Return ONLY a valid JSON array, no markdown, no surrounding text:
   {{
     "action": "exact action title verbatim",
     "action_type": "feature",
-    "feedbacks": ["verbatim quote 1", "verbatim quote 2"],
-    "rice": {{ "reach": 6, "impact": 2, "confidence": 0.7, "effort_label": "L", "effort": 4, "score": 21 }},
-    "feedbacks": [{{"text": "verbatim quote"}}],
+    "feedbacks": [
+      {{"text": "verbatim English quote"}}
+    ],
+    "rice": {{"reach": 6, "impact": 2, "confidence": 0.7, "effort_label": "L", "effort": 4, "score": 21}},
     "user_story": "As a [user type], I want [specific thing] so that [concrete benefit]",
     "acceptance_criteria": [
       "Given [context], when [action], then [expected result]",
@@ -396,9 +390,10 @@ Return ONLY a valid JSON array, no markdown, no surrounding text:
   {{
     "action": "exact action title verbatim",
     "action_type": "ux",
-    "feedbacks": ["verbatim quote 1"],
-    "rice": {{ "reach": 5, "impact": 2, "confidence": 0.6, "effort_label": "S", "effort": 1, "score": 60 }},
-    "feedbacks": [{{"text": "verbatim quote"}}],
+    "feedbacks": [
+      {{"text": "verbatim English quote"}}
+    ],
+    "rice": {{"reach": 5, "impact": 2, "confidence": 0.6, "effort_label": "S", "effort": 1, "score": 60}},
     "problem": "Clear problem statement from the user's perspective",
     "success_metric": "How you will measure that this is resolved",
     "next_step": "Concrete first action (design, A/B test, research, etc.)"
@@ -414,7 +409,8 @@ Return ONLY a valid JSON array, no markdown, no surrounding text:
                 raise ValueError
             # Sort by RICE score descending
             cards.sort(key=lambda c: c.get("rice", {}).get("score", 0), reverse=True)
-        except Exception:
+        except Exception as e:
+            print(f"[generate_user_stories] parse error: {e}\nRaw output: {text[:500]}")
             cards = []
         return cards, used_fallback
 
