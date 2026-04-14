@@ -22,11 +22,11 @@ interface Props {
 }
 
 export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore, disabled }: Props) {
-  const [tab, setTab] = useState<Tab>("text");
+  const [tab, setTab] = useState<Tab>("store");
   const [text, setText] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [store, setStore] = useState<Store>("appstore");
+  const [store, setStore] = useState<Store>("googleplay");
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [apps, setApps] = useState<AppEntry[]>([]);
@@ -67,7 +67,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
     <div className="w-full max-w-2xl mx-auto">
       {/* Tabs */}
       <div className="flex border-b border-gray-200 mb-6">
-        {(["text", "csv", "store"] as Tab[]).map((t) => (
+        {(["store", "text", "csv"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -147,7 +147,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
         <div className="space-y-4">
           {/* Store toggle */}
           <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
-            {(["appstore", "googleplay"] as Store[]).map((s) => (
+            {(["googleplay", "appstore"] as Store[]).map((s) => (
               <button
                 key={s}
                 onClick={() => setStore(s)}
