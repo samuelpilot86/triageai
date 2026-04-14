@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Upload, ChevronDown, ClipboardList, FileSpreadsheet, Star } from "lucide-react";
+import { Upload, ChevronDown, ClipboardList, FileSpreadsheet, Star, Zap } from "lucide-react";
 import { Store, AppEntry } from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7860";
 
-type Tab = "text" | "csv" | "store";
+type Tab = "text" | "csv" | "store" | "demo";
 
 interface Props {
   onAnalyzeText: (feedbacks: string[]) => void;
@@ -128,10 +128,14 @@ const TAB_META: Record<Tab, { label: string; icon: React.ReactNode }> = {
     label: "Upload CSV",
     icon: <FileSpreadsheet className="w-4 h-4" />,
   },
+  demo: {
+    label: "Demo",
+    icon: <Zap className="w-4 h-4" />,
+  },
 };
 
 export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore, disabled }: Props) {
-  const [tab, setTab] = useState<Tab>("store");
+  const [tab, setTab] = useState<Tab>("demo");
   const [text, setText] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -176,7 +180,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
     <div className="w-full max-w-2xl mx-auto">
       {/* Tabs */}
       <div className="flex border-b border-gray-200 mb-6">
-        {(["store", "text", "csv"] as Tab[]).map((t) => (
+        {(["store", "text", "csv", "demo"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -202,20 +206,10 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
             className="w-full h-52 px-4 py-3 text-sm rounded-xl border border-gray-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-gray-400"
           />
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-400">
-                {feedbacks.length} feedback{feedbacks.length !== 1 ? "s" : ""}
-                {feedbacks.length > 100 && " — first 100 will be analyzed"}
-              </span>
-              {feedbacks.length === 0 && (
-                <button
-                  onClick={() => setText(SAMPLE_FEEDBACKS)}
-                  className="text-xs text-indigo-500 hover:text-indigo-700 font-medium underline underline-offset-2"
-                >
-                  Try with 100 sample feedbacks →
-                </button>
-              )}
-            </div>
+            <span className="text-xs text-gray-400">
+              {feedbacks.length} feedback{feedbacks.length !== 1 ? "s" : ""}
+              {feedbacks.length > 100 && " — first 100 will be analyzed"}
+            </span>
             <button
               onClick={() => onAnalyzeText(feedbacks.slice(0, 100))}
               disabled={!canSubmitText}
@@ -257,6 +251,28 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
               className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-indigo-700 transition-colors shadow-sm"
             >
               Analyze feedbacks →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Demo */}
+      {tab === "demo" && (
+        <div className="space-y-3">
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+            <p className="text-xs text-indigo-600 font-medium mb-1">100 sample app reviews ready to analyze</p>
+            <p className="text-xs text-indigo-400 line-clamp-2">
+              "The app crashes every time I try to open it…" · "Dark mode is missing…" · "Loading times are way too slow…" · and 97 more
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={() => onAnalyzeText(SAMPLE_FEEDBACKS.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 100))}
+              disabled={disabled}
+              className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-indigo-700 transition-colors shadow-sm"
+            >
+              <Zap className="w-4 h-4" />
+              Run demo →
             </button>
           </div>
         </div>
