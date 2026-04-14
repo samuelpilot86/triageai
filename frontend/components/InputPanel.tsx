@@ -180,7 +180,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
     <div className="w-full max-w-2xl mx-auto">
       {/* Tabs */}
       <div className="flex border-b border-gray-200 mb-6">
-        {(["store", "text", "csv", "demo"] as Tab[]).map((t) => (
+        {(["store", "csv", "text", "demo"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -191,7 +191,9 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
             }`}
           >
             {TAB_META[t].icon}
-            {TAB_META[t].label}
+            <span className={t === "text" ? "line-through opacity-50" : ""}>
+              {TAB_META[t].label}
+            </span>
           </button>
         ))}
       </div>
@@ -259,13 +261,13 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
       {/* Tab: Demo */}
       {tab === "demo" && (
         <div className="space-y-3">
-          <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
-            <p className="text-xs text-indigo-600 font-medium mb-1">100 sample app reviews ready to analyze</p>
-            <p className="text-xs text-indigo-400 line-clamp-2">
-              "The app crashes every time I try to open it…" · "Dark mode is missing…" · "Loading times are way too slow…" · and 97 more
-            </p>
-          </div>
-          <div className="flex justify-end">
+          <textarea
+            readOnly
+            value={SAMPLE_FEEDBACKS}
+            className="w-full h-52 px-4 py-3 text-sm rounded-xl border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-500"
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">100 sample feedbacks</span>
             <button
               onClick={() => onAnalyzeText(SAMPLE_FEEDBACKS.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 100))}
               disabled={disabled}
