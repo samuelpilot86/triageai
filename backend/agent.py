@@ -346,7 +346,11 @@ with a concise English translation. If it IS English, omit the "translation" fie
 STEP 3 — Estimate RICE:
 - reach: integer count of feedbacks (from the full list above) that directly mention this issue
 - impact: 1=low friction | 2=significant friction or churn risk | 3=blocking or critical
-- confidence: 0.2 to 1.0 (higher when many consistent signals, lower when few or ambiguous)
+- confidence: 0.2 to 1.0 — how reliable are your estimates of R, I and E?
+    Independent of reach. Ask: "How sure am I that these numbers are right?"
+    * 0.8–1.0 : issue is clearly defined and reproducible; impact and effort estimates are well-grounded
+    * 0.5–0.7 : estimates are reasonable but uncertain — root cause unclear, impact could vary, effort hard to scope
+    * 0.2–0.4 : significant uncertainty in at least one estimate — vague problem, unknown complexity, or speculative impact
 - effort_label: "XS" (hours) | "S" (days) | "M" (1–2 sprints) | "L" (3–4 sprints) | "XL" (quarter+)
 - effort: XS=0.5, S=1, M=2, L=4, XL=8
 - score: integer, formula = round((reach * impact * confidence / effort) * 10)
