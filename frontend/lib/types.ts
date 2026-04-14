@@ -8,6 +8,7 @@ export interface FeedbackItem {
   priority: "High" | "Medium" | "Low";
   priority_reason: string;
   sentiment: "Positive" | "Neutral" | "Negative";
+  actionable?: boolean;
 }
 
 export interface Correction {
@@ -18,7 +19,12 @@ export interface Correction {
   reason: string;
 }
 
-export type ActionType = "bug" | "performance" | "feature" | "ux" | "pricing" | "other";
+export type ActionType = "bug" | "performance" | "feature" | "ux" | "pricing" | "ai_quality" | "other";
+
+export interface SprintFeedback {
+  text: string;
+  translation?: string;
+}
 
 export interface RiceScore {
   reach: number;
@@ -32,7 +38,7 @@ export interface RiceScore {
 export interface UserStoryCard {
   action: string;
   action_type: ActionType;
-  feedbacks: string[];
+  feedbacks: SprintFeedback[];
   rice: RiceScore;
   // bug / performance
   what_breaks?: string;

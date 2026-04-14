@@ -66,11 +66,16 @@ export default function FeedbackTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {items.map((item) => (
-            <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
-              <td className="px-4 py-3 text-gray-400 text-xs">{item.id}</td>
+          {items.map((item) => {
+            const nonActionable = item.actionable === false;
+            return (
+            <tr key={item.id} className={`transition-colors group ${nonActionable ? "opacity-40" : "hover:bg-gray-50"}`}>
+              <td className="px-4 py-3 text-gray-400 text-xs">
+                {item.id}
+                {nonActionable && <span className="ml-1 text-gray-300" title="Non-actionable feedback">—</span>}
+              </td>
               <td className="px-4 py-3">
-                <span className="font-medium text-gray-800">{item.summary}</span>
+                <span className={`font-medium ${nonActionable ? "text-gray-500" : "text-gray-800"}`}>{item.summary}</span>
                 <p className="text-xs text-gray-400 mt-0.5 line-clamp-1 group-hover:line-clamp-none transition-all">
                   {item.original}
                 </p>
@@ -90,7 +95,8 @@ export default function FeedbackTable({
                 </span>
               </td>
             </tr>
-          ))}
+            );
+          })}
           {Array.from({ length: skeletonCount }).map((_, i) => (
             <SkeletonRow key={`skel-${i}`} index={i} />
           ))}

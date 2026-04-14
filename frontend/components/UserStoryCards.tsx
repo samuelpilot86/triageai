@@ -1,6 +1,6 @@
 "use client";
 
-import { UserStoryCard, ActionType, RiceScore } from "@/lib/types";
+import { UserStoryCard, ActionType, RiceScore, SprintFeedback } from "@/lib/types";
 
 // ------------------------------------------------------------------
 // Type metadata
@@ -12,6 +12,7 @@ const TYPE_META: Record<ActionType, { emoji: string; label: string; color: strin
   feature:     { emoji: "✨", label: "Feature",     color: "text-indigo-700", border: "border-l-indigo-400", badge: "bg-indigo-100 text-indigo-700" },
   ux:          { emoji: "🎨", label: "UX",          color: "text-violet-700", border: "border-l-violet-400", badge: "bg-violet-100 text-violet-700" },
   pricing:     { emoji: "💰", label: "Pricing",     color: "text-emerald-700",border: "border-l-emerald-400",badge: "bg-emerald-100 text-emerald-700" },
+  ai_quality:  { emoji: "🤖", label: "AI Quality",  color: "text-blue-700",   border: "border-l-blue-400",   badge: "bg-blue-100 text-blue-700" },
   other:       { emoji: "📌", label: "Other",       color: "text-gray-700",   border: "border-l-gray-400",   badge: "bg-gray-100 text-gray-600" },
 };
 
@@ -192,13 +193,23 @@ export default function UserStoryCards({ cards }: { cards: UserStoryCard[] }) {
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
                       Supporting feedbacks
                     </p>
-                    <ul className="space-y-1.5">
-                      {card.feedbacks.map((f, j) => (
-                        <li key={j} className="flex gap-2 text-sm text-gray-500">
-                          <span className="text-gray-300 select-none shrink-0 mt-0.5">›</span>
-                          <span className="italic">"{f}"</span>
-                        </li>
-                      ))}
+                    <ul className="space-y-2.5">
+                      {card.feedbacks.map((f, j) => {
+                        const fb: SprintFeedback = typeof f === "string" ? { text: f } : f;
+                        return (
+                          <li key={j} className="flex gap-2">
+                            <span className="text-gray-300 select-none shrink-0 mt-0.5">›</span>
+                            <div>
+                              <span className="text-sm text-gray-500 italic">"{fb.text}"</span>
+                              {fb.translation && (
+                                <p className="text-xs text-gray-400 mt-0.5 not-italic">
+                                  🌐 {fb.translation}
+                                </p>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 )}
