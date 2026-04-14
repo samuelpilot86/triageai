@@ -101,8 +101,8 @@ export default function ReportPanel({ result }: { result: AnalysisResult }) {
           corrections.map((c, i) => (
             <div key={i} className="text-xs text-gray-600 bg-gray-50 px-3 py-2 rounded-lg">
               <span className="font-medium">#{c.id}</span> — {c.field}:{" "}
-              <span className="line-through text-gray-400">{c.old_value}</span>{" "}
-              → <span className="font-medium text-indigo-600">{c.new_value}</span>{" "}
+              <span className="line-through text-gray-400">{String(c.old_value)}</span>{" "}
+              → <span className="font-medium text-indigo-600">{String(c.new_value)}</span>{" "}
               <span className="text-gray-400">({c.reason})</span>
             </div>
           ))
