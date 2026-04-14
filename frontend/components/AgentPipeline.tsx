@@ -128,24 +128,28 @@ function IrisProgressBar({
     return () => clearInterval(id);
   }, []);
 
-  if (!startedAt || !estimatedMs) return null;
+  if (!startedAt) return null;
 
   const elapsed = Date.now() - startedAt;
-  const progress = asymptoticProgress(elapsed, estimatedMs);
   const elapsedSec = Math.floor(elapsed / 1000);
-  const estimatedSec = Math.round(estimatedMs / 1000);
+  const progress = estimatedMs ? asymptoticProgress(elapsed, estimatedMs) : 0;
+  const estimatedSec = estimatedMs ? Math.round(estimatedMs / 1000) : null;
 
   return (
     <div className="mt-3 space-y-1">
       <div className="w-full h-1 bg-indigo-100 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-indigo-500 rounded-full transition-all duration-300 ease-out"
-          style={{ width: `${progress}%` }}
-        />
+        {estimatedMs ? (
+          <div
+            className="h-full bg-indigo-500 rounded-full transition-all duration-300 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+        ) : (
+          <div className="h-full bg-indigo-300 rounded-full animate-pulse w-1/3" />
+        )}
       </div>
       <div className="flex justify-between text-xs text-indigo-400">
-        <span>{elapsedSec}s elapsed</span>
-        {progress < 88 && <span>~{estimatedSec}s est.</span>}
+        <span>{elapsedSec}s</span>
+        {estimatedSec && progress < 88 && <span>~{estimatedSec}s est.</span>}
       </div>
     </div>
   );
@@ -232,12 +236,12 @@ function AgentCard({
         <p className="mt-2 text-xs text-emerald-600 font-medium">{stat.label}</p>
       )}
 
-      {/* Progress bar for Iris when active */}
+      {/* Progress bar for Iris (categorization) or Hugo (report) when active */}
       {isActive && agent.id === "categorization" && step.type === "categorization" && (
-        <IrisProgressBar
-          startedAt={step.startedAt}
-          estimatedMs={step.estimatedMs}
-        />
+        <IrisProgressBar startedAt={step.startedAt} estimatedMs={step.estimatedMs} />
+      )}
+      {isActive && agent.id === "report" && step.type === "report" && (
+        <IrisProgressBar startedAt={step.startedAt} estimatedMs={step.estimatedMs} />
       )}
     </div>
   );

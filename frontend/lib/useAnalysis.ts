@@ -10,25 +10,32 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7860";
 // ------------------------------------------------------------------
 
 const FALLBACK_MS_PER_FEEDBACK = 200;
+const FALLBACK_REPORT_MS = 15_000;
 
-async function fetchTimingEstimate(n: number): Promise<number> {
+async function fetchTimingEstimate(step: "categorization" | "report", n?: number): Promise<number> {
   try {
-    const res = await fetch(`${API_BASE}/api/timings`);
-    if (!res.ok) return n * FALLBACK_MS_PER_FEEDBACK;
-    const { timings } = await res.json() as { timings: { n: number; ms: number }[] };
-    if (!timings.length) return n * FALLBACK_MS_PER_FEEDBACK;
-    const avgMsPerFeedback = timings.reduce((sum, t) => sum + t.ms / t.n, 0) / timings.length;
-    return Math.round(n * avgMsPerFeedback);
+    const res = await fetch(`${API_BASE}/api/timings?step=${step}`);
+    if (!res.ok) throw new Error();
+    const { timings } = await res.json() as { timings: { ms: number; n?: number }[] };
+    if (!timings.length) throw new Error();
+    if (step === "categorization" && n) {
+      const avgMsPerFeedback = timings.reduce((sum, t) => sum + t.ms / (t.n ?? n), 0) / timings.length;
+      return Math.round(n * avgMsPerFeedback);
+    }
+    // For report: simple average of raw durations (not per-feedback)
+    return Math.round(timings.reduce((sum, t) => sum + t.ms, 0) / timings.length);
   } catch {
-    return n * FALLBACK_MS_PER_FEEDBACK;
+    return step === "categorization"
+      ? (n ?? 50) * FALLBACK_MS_PER_FEEDBACK
+      : FALLBACK_REPORT_MS;
   }
 }
 
-function recordTiming(n: number, ms: number): void {
+function recordTiming(step: "categorization" | "report", ms: number, n?: number): void {
   fetch(`${API_BASE}/api/timings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ n, ms }),
+    body: JSON.stringify({ step, ms, ...(n !== undefined ? { n } : {}) }),
   }).catch(() => {});
 }
 
@@ -102,6 +109,7 @@ export function useAnalysis() {
   const reportRef = useRef<{ text: string; fallback: boolean } | null>(null);
   const userStoryCardsRef = useRef<UserStoryCard[]>([]);
   const categorizationStartRef = useRef<number | null>(null);
+  const reportStartRef = useRef<number | null>(null);
   const nFeedbacksRef = useRef<number>(0);
 
   const reset = useCallback(() => {
@@ -112,6 +120,7 @@ export function useAnalysis() {
     reportRef.current = null;
     userStoryCardsRef.current = [];
     categorizationStartRef.current = null;
+    reportStartRef.current = null;
     nFeedbacksRef.current = 0;
   }, []);
 
@@ -129,23 +138,35 @@ export function useAnalysis() {
     if (event === "status") {
       const s = d.step as string;
       if (s === "scraping") setStep({ type: "scraping" });
-      else if (s === "report") setStep({ type: "report" });
+      else if (s === "report") {
+        // Record categorization timing, then fetch report estimate
+        if (categorizationStartRef.current !== null && nFeedbacksRef.current > 0) {
+          const elapsed = Date.now() - categorizationStartRef.current;
+          recordTiming("categorization", elapsed, nFeedbacksRef.current);
+          categorizationStartRef.current = null;
+        }
+        fetchTimingEstimate("report").then((estimatedMs) => {
+          const startedAt = Date.now();
+          reportStartRef.current = startedAt;
+          setStep({ type: "report", estimatedMs, startedAt });
+        });
+      }
       // "categorization" status is set by startCategorization with the estimate
     } else if (event === "scraped") {
       setStep((prev) =>
         prev.type === "categorization" ? prev : { type: "categorization" }
       );
     } else if (event === "categorization") {
-      // Record elapsed time and send to backend
-      if (categorizationStartRef.current !== null && nFeedbacksRef.current > 0) {
-        const elapsed = Date.now() - categorizationStartRef.current;
-        recordTiming(nFeedbacksRef.current, elapsed);
-        categorizationStartRef.current = null;
-      }
       setPartialItems(d.items as FeedbackItem[]);
       correctionsRef.current = (d.corrections as Correction[]) ?? [];
       usedFallbackRef.current = (d.used_fallback as boolean) ?? false;
     } else if (event === "report") {
+      // Record report timing
+      if (reportStartRef.current !== null) {
+        const elapsed = Date.now() - reportStartRef.current;
+        recordTiming("report", elapsed);
+        reportStartRef.current = null;
+      }
       reportRef.current = {
         text: d.text as string,
         fallback: d.used_fallback as boolean,
@@ -170,7 +191,7 @@ export function useAnalysis() {
     n: number,
     launchStream: () => () => void
   ) => {
-    const estimatedMs = await fetchTimingEstimate(n);
+    const estimatedMs = await fetchTimingEstimate("categorization", n);
     const startedAt = Date.now();
     categorizationStartRef.current = startedAt;
     nFeedbacksRef.current = n;
@@ -225,7 +246,7 @@ export function useAnalysis() {
         // When scraping done, switch to categorization with estimate
         if (event === "scraped") {
           const count = (data as Record<string, unknown>).count as number ?? 100;
-          const estimatedMs = await fetchTimingEstimate(count);
+          const estimatedMs = await fetchTimingEstimate("categorization", count);
           const startedAt = Date.now();
           categorizationStartRef.current = startedAt;
           nFeedbacksRef.current = count;

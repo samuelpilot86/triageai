@@ -59,7 +59,7 @@ export type AnalysisStep =
   | { type: "idle" }
   | { type: "scraping" }
   | { type: "categorization"; estimatedMs?: number; startedAt?: number; nFeedbacks?: number; scrapedCount?: number }
-  | { type: "report" }
+  | { type: "report"; estimatedMs?: number; startedAt?: number }
   | { type: "done"; result: AnalysisResult }
   | { type: "error"; message: string };
 
