@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import InputPanel from "@/components/InputPanel";
 import FeedbackTable from "@/components/FeedbackTable";
-import ReportPanel from "@/components/ReportPanel";
+import { ExecutiveReport, FeedbackStats, FallbackBanner, IrisCorrections } from "@/components/ReportPanel";
 import UserStoryCards from "@/components/UserStoryCards";
 import AgentPipeline from "@/components/AgentPipeline";
 import { useAnalysis } from "@/lib/useAnalysis";
@@ -22,7 +22,6 @@ export default function Home() {
 
   const isRunning = step.type !== "idle" && step.type !== "done" && step.type !== "error";
   const showResults = partialItems.length > 0 || step.type === "categorization" || step.type === "done" || step.type === "error";
-  // Show skeleton rows while categorizing and no real results yet
   const skeletonCount = step.type === "categorization" && partialItems.length === 0
     ? Math.min(step.nFeedbacks ?? 10, 10)
     : 0;
@@ -40,7 +39,7 @@ export default function Home() {
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-lg font-semibold text-gray-900">trIAge</h1>
-            <p className="text-xs text-gray-400">Product feedback triage, powered by AI</p>
+            <p className="text-xs text-gray-400">Product feedback triage for PMs, powered by AI agents</p>
           </div>
           {step.type !== "idle" && (
             <button
@@ -70,17 +69,6 @@ export default function Home() {
           </section>
         )}
 
-        {/* Agent pipeline — shown while running and when done */}
-        {(isRunning || step.type === "done") && (
-          <section className="py-4">
-            <AgentPipeline
-              step={step}
-              scrapedCount={pipelineMetaRef.current.scrapedCount}
-              nFeedbacks={pipelineMetaRef.current.nFeedbacks}
-            />
-          </section>
-        )}
-
         {/* Error */}
         {step.type === "error" && (
           <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4 text-sm text-red-700">
@@ -89,31 +77,65 @@ export default function Home() {
           </div>
         )}
 
-        {/* Results */}
-        {showResults && (
-          <div ref={resultsRef} className="space-y-8">
-            {(partialItems.length > 0 || skeletonCount > 0) && (
-              <section className="space-y-2">
-                <h2 className="text-sm font-medium text-gray-500">
-                  Detailed results
-                  {isRunning && step.type === "report" && (
-                    <span className="ml-2 text-xs text-indigo-500 animate-pulse">Generating report…</span>
-                  )}
-                </h2>
-                <FeedbackTable items={partialItems} skeletonCount={skeletonCount} />
-              </section>
-            )}
+        <div ref={resultsRef} className="space-y-10">
+          {/* 1 — Agent pipeline */}
+          {(isRunning || step.type === "done") && (
+            <section className="py-4">
+              <AgentPipeline
+                step={step}
+                scrapedCount={pipelineMetaRef.current.scrapedCount}
+                nFeedbacks={pipelineMetaRef.current.nFeedbacks}
+              />
+            </section>
+          )}
 
-            {step.type === "done" && (
-              <section className="space-y-8">
-                <ReportPanel result={step.result} />
-                {step.result.user_story_cards.length > 0 && (
+          {step.type === "done" && (
+            <>
+              {/* 2 — Executive Report */}
+              {step.result.report && (
+                <section>
+                  <ExecutiveReport report={step.result.report} />
+                </section>
+              )}
+
+              {/* Sprint cards */}
+              {step.result.user_story_cards.length > 0 && (
+                <section>
                   <UserStoryCards cards={step.result.user_story_cards} />
-                )}
+                </section>
+              )}
+
+              {/* 3 — Summary stats */}
+              <section>
+                <FeedbackStats items={step.result.items} />
+                <FallbackBanner
+                  used_fallback={step.result.used_fallback}
+                  report_fallback={step.result.report_fallback}
+                />
               </section>
-            )}
-          </div>
-        )}
+            </>
+          )}
+
+          {/* 4 — Qualified feedbacks */}
+          {showResults && (partialItems.length > 0 || skeletonCount > 0) && (
+            <section className="space-y-2">
+              <h2 className="text-sm font-medium text-gray-500">
+                Qualified feedbacks
+                {isRunning && step.type === "report" && (
+                  <span className="ml-2 text-xs text-indigo-500 animate-pulse">Generating report…</span>
+                )}
+              </h2>
+              <FeedbackTable items={partialItems} skeletonCount={skeletonCount} />
+            </section>
+          )}
+
+          {/* 5 — Iris self-corrections */}
+          {step.type === "done" && (
+            <section>
+              <IrisCorrections result={step.result} />
+            </section>
+          )}
+        </div>
       </main>
     </div>
   );
