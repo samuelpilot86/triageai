@@ -94,10 +94,10 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-400">
               {feedbacks.length} feedback{feedbacks.length !== 1 ? "s" : ""}
-              {feedbacks.length > 50 && " — first 50 will be analyzed"}
+              {feedbacks.length > 100 && " — first 100 will be analyzed"}
             </span>
             <button
-              onClick={() => onAnalyzeText(feedbacks.slice(0, 50))}
+              onClick={() => onAnalyzeText(feedbacks.slice(0, 100))}
               disabled={!canSubmitText}
               className="px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium disabled:opacity-40 hover:bg-indigo-700 transition-colors"
             >

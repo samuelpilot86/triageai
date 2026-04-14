@@ -104,8 +104,8 @@ async def analyze_text(body: dict):
     feedbacks = body.get("feedbacks", [])
     if not feedbacks or len(feedbacks) < 2:
         raise HTTPException(status_code=422, detail="At least 2 feedbacks required.")
-    if len(feedbacks) > 50:
-        feedbacks = feedbacks[:50]
+    if len(feedbacks) > 100:
+        feedbacks = feedbacks[:100]
     return StreamingResponse(analysis_stream(feedbacks), media_type="text/event-stream", headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
 
 
@@ -129,8 +129,8 @@ async def analyze_csv(file: UploadFile = File(...)):
 
     if len(feedbacks) < 2:
         raise HTTPException(status_code=422, detail="CSV must contain at least 2 feedbacks.")
-    if len(feedbacks) > 50:
-        feedbacks = feedbacks[:50]
+    if len(feedbacks) > 100:
+        feedbacks = feedbacks[:100]
 
     return StreamingResponse(analysis_stream(feedbacks), media_type="text/event-stream", headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
 
@@ -151,10 +151,10 @@ async def analyze_store(body: dict):
         yield sse_event("status", {"step": "scraping", "message": f"Fetching reviews for {app_entry['name']}…"})
         try:
             if store == "googleplay":
-                feedbacks = await fetch_play_store_reviews(app_entry["id"], count=50)
+                feedbacks = await fetch_play_store_reviews(app_entry["id"], count=100)
                 source = "Google Play"
             else:
-                feedbacks = await fetch_app_store_reviews(app_entry["id"], count=50)
+                feedbacks = await fetch_app_store_reviews(app_entry["id"], count=100)
                 source = "App Store"
         except Exception as e:
             yield sse_event("error", {"message": f"Scraping failed: {str(e)}"})
@@ -166,7 +166,7 @@ async def analyze_store(body: dict):
 
         yield sse_event("scraped", {"count": len(feedbacks), "source": source})
 
-        async for chunk in analysis_stream(feedbacks[:50]):
+        async for chunk in analysis_stream(feedbacks[:100]):
             yield chunk
 
     return StreamingResponse(stream(), media_type="text/event-stream", headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})

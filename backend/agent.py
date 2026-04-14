@@ -35,8 +35,9 @@ _TOKENS_OVERHEAD = 512
 # Groq free tier: 12 000 TPM (input + output combined).
 # At ~1 500 tokens of input overhead + 250 per feedback output,
 # max safe feedbacks per call = floor((12000 - 1500) / 250) = 42.
-# Use 20 to leave a comfortable margin.
-GROQ_CHUNK_SIZE = 20
+# Use 25 for a balance between safety margin and number of API calls.
+# 100 feedbacks → 4 chunks of 25 (vs 5 chunks of 20 before).
+GROQ_CHUNK_SIZE = 25
 
 
 class FeedbackTriageAgent:
