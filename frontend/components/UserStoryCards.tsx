@@ -201,7 +201,7 @@ export default function UserStoryCards({ cards }: { cards: UserStoryCard[] }) {
                             <span className="text-gray-300 select-none shrink-0 mt-0.5">›</span>
                             <div>
                               <span className="text-sm text-gray-500 italic">"{fb.text}"</span>
-                              {fb.translation && (
+                              {fb.translation && fb.translation.trim().toLowerCase() !== fb.text.trim().toLowerCase() && (
                                 <p className="text-xs text-gray-400 mt-0.5 not-italic">
                                   🌐 {fb.translation}
                                 </p>
