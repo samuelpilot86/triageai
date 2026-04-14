@@ -325,14 +325,14 @@ HIGH/MEDIUM PRIORITY USER FEEDBACKS:
 
 For each action, produce a structured card containing:
 1. The exact action title (verbatim from the list above)
-2. The 3–5 user feedback quotes (use "original" field) that most directly justify this action
+2. 2–4 user feedback quotes that are DIRECTLY and SPECIFICALLY about this action's topic
 3. 1–2 user stories in the format "As a [user type], I want [specific feature/fix] so that [concrete benefit]", each with 2–4 acceptance criteria
 
 Return ONLY valid JSON, no markdown, no surrounding text:
 [
   {{
     "action": "exact action title",
-    "feedbacks": ["original quote 1", "original quote 2", "original quote 3"],
+    "feedbacks": ["original quote 1", "original quote 2"],
     "user_stories": [
       {{
         "title": "As a [user type], I want [X] so that [Y]",
@@ -347,6 +347,8 @@ Return ONLY valid JSON, no markdown, no surrounding text:
 
 Rules:
 - Use verbatim quotes from the "original" field — do not paraphrase
+- STRICT RELEVANCE: only include a quote if it explicitly mentions the specific issue addressed by the action (e.g. for a loading/performance action, only quotes that mention loading, crashing, lag, or speed — NOT generic negative reviews)
+- If fewer than 2 quotes are relevant, include only the relevant ones — do not pad with loosely related feedbacks
 - User story titles must be specific and actionable, not generic
 - Acceptance criteria must be testable (Given/When/Then format preferred)
 - Each card must have at least 1 user story, at most 2"""
