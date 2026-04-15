@@ -159,26 +159,46 @@ IMPORTANT RULES FOR CORRECTIONS:
 
     async def _call_llm(self, prompt: str, n_feedbacks: int | None = None, max_tokens: int | None = None, _force_groq: bool = False) -> tuple[str, bool]:
         """
-        Calls the primary model (Gemini). If quota is exhausted (429),
-        falls back to Groq automatically.
+        Calls the primary model (Gemini) with up to 2 retries on transient errors
+        (503 UNAVAILABLE, high demand), then falls back to Groq on quota/persistent errors.
         Returns (response_text, used_fallback).
         Raises if both models fail or Groq is not configured.
         """
+        import asyncio as _asyncio
+
+        def _is_retryable(error_str: str) -> bool:
+            return "503" in error_str or "UNAVAILABLE" in error_str or "high demand" in error_str.lower()
+
+        def _is_quota(error_str: str) -> bool:
+            return "429" in error_str or "RESOURCE_EXHAUSTED" in error_str
+
         # Try Gemini first (unless forced to Groq for chunked calls)
         if not _force_groq:
-            try:
-                response = await self.client.aio.models.generate_content(
-                    model=PRIMARY_MODEL,
-                    contents=prompt,
-                )
-                return self._extract_text(response), False
+            last_error = None
+            for attempt in range(3):  # 1 initial + 2 retries
+                try:
+                    response = await self.client.aio.models.generate_content(
+                        model=PRIMARY_MODEL,
+                        contents=prompt,
+                    )
+                    return self._extract_text(response), False
 
-            except Exception as e:
-                error_str = str(e)
-                is_quota = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str
+                except Exception as e:
+                    error_str = str(e)
+                    last_error = e
 
-                if not is_quota:
-                    raise  # Non-quota error: propagate immediately
+                    if _is_retryable(error_str) and attempt < 2:
+                        # Transient overload — wait and retry
+                        await _asyncio.sleep(2 ** attempt)  # 1s, 2s
+                        continue
+                    elif _is_quota(error_str) or _is_retryable(error_str):
+                        # Quota exhausted or still failing after retries — go to Groq
+                        break
+                    else:
+                        raise  # Unexpected error: propagate immediately
+
+            # All Gemini attempts failed with quota/overload
+            _ = last_error  # suppress unused warning
 
         if not self.groq_client:
             raise RuntimeError(
@@ -237,6 +257,9 @@ IMPORTANT RULES FOR CORRECTIONS:
                 or "RESOURCE_EXHAUSTED" in error_str
                 or "413" in error_str
                 or "Request too large" in error_str
+                or "503" in error_str
+                or "UNAVAILABLE" in error_str
+                or "high demand" in error_str.lower()
             )
             if not is_quota or not self.groq_client:
                 raise
