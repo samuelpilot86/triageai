@@ -9,20 +9,71 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7860";
 // Jira button with confirmation modal
 // ------------------------------------------------------------------
 
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+const inputCls = "w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none";
+
 function JiraButton({ card }: { card: UserStoryCard }) {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ key: string; url: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Editable fields — initialized from card
+  const [title, setTitle] = useState(card.action);
+  const [userStory, setUserStory] = useState(card.user_story ?? "");
+  const [whatBreaks, setWhatBreaks] = useState(card.what_breaks ?? "");
+  const [problem, setProblem] = useState(card.problem ?? "");
+  const [doneWhen, setDoneWhen] = useState(card.done_when ?? "");
+  const [successMetric, setSuccessMetric] = useState(card.success_metric ?? "");
+  const [nextStep, setNextStep] = useState(card.next_step ?? "");
+  const [criteria, setCriteria] = useState<string[]>(card.acceptance_criteria ?? []);
+  const [feedbacks, setFeedbacks] = useState<string[]>(
+    (card.feedbacks ?? []).map((f) => (typeof f === "string" ? f : f.text))
+  );
+
+  function openModal() {
+    // Reset to card values each time modal opens
+    setTitle(card.action);
+    setUserStory(card.user_story ?? "");
+    setWhatBreaks(card.what_breaks ?? "");
+    setProblem(card.problem ?? "");
+    setDoneWhen(card.done_when ?? "");
+    setSuccessMetric(card.success_metric ?? "");
+    setNextStep(card.next_step ?? "");
+    setCriteria(card.acceptance_criteria ?? []);
+    setFeedbacks((card.feedbacks ?? []).map((f) => (typeof f === "string" ? f : f.text)));
+    setError(null);
+    setShowModal(true);
+  }
+
   async function sendToJira() {
     setLoading(true);
     setError(null);
+    const payload = {
+      ...card,
+      action: title,
+      user_story: userStory || undefined,
+      what_breaks: whatBreaks || undefined,
+      problem: problem || undefined,
+      done_when: doneWhen || undefined,
+      success_metric: successMetric || undefined,
+      next_step: nextStep || undefined,
+      acceptance_criteria: criteria.filter(Boolean),
+      feedbacks: feedbacks.filter(Boolean).map((t) => ({ text: t })),
+    };
     try {
       const resp = await fetch(`${API_BASE}/api/jira/create-issue`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(card),
+        body: JSON.stringify(payload),
       });
       if (!resp.ok) throw new Error(await resp.text());
       const data = await resp.json();
@@ -37,12 +88,8 @@ function JiraButton({ card }: { card: UserStoryCard }) {
 
   if (result) {
     return (
-      <a
-        href={result.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-      >
+      <a href={result.url} target="_blank" rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
         <img src="https://www.atlassian.com/favicon.ico" className="w-3 h-3" alt="" />
         {result.key} ↗
       </a>
@@ -51,33 +98,125 @@ function JiraButton({ card }: { card: UserStoryCard }) {
 
   return (
     <>
-      <button
-        onClick={() => setShowModal(true)}
-        className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-600 transition-colors"
-      >
+      <button onClick={openModal}
+        className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-600 transition-colors">
         <img src="https://www.atlassian.com/favicon.ico" className="w-3 h-3" alt="" />
         Create Jira ticket
       </button>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4 space-y-4">
-            <h3 className="text-sm font-semibold text-gray-900">Create Jira ticket</h3>
-            <div className="space-y-2 text-xs text-gray-600">
-              <div><span className="font-medium text-gray-500">Title</span><p className="mt-0.5 text-gray-800 font-medium">{card.action}</p></div>
-              <div><span className="font-medium text-gray-500">Type</span><p className="mt-0.5">{card.action_type}</p></div>
-              {card.rice && <div><span className="font-medium text-gray-500">RICE score</span><p className="mt-0.5">{card.rice.score}</p></div>}
-              {card.user_story && <div><span className="font-medium text-gray-500">User story</span><p className="mt-0.5">{card.user_story}</p></div>}
-              {card.next_step && <div><span className="font-medium text-gray-500">Next step</span><p className="mt-0.5">{card.next_step}</p></div>}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <img src="https://www.atlassian.com/favicon.ico" className="w-4 h-4" alt="" />
+                <h3 className="text-sm font-semibold text-gray-900">Create Jira ticket</h3>
+              </div>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
             </div>
-            {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
-            <div className="flex justify-end gap-2 pt-1">
-              <button onClick={() => { setShowModal(false); setError(null); }} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
-              <button
-                onClick={sendToJira}
-                disabled={loading}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium disabled:opacity-50 hover:bg-blue-700 transition-colors"
-              >
+
+            {/* Scrollable body */}
+            <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
+
+              <Field label="Title">
+                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+                  className={inputCls} />
+              </Field>
+
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <Field label="Type">
+                    <p className="text-sm text-gray-600 py-2">{card.action_type}</p>
+                  </Field>
+                </div>
+                {card.rice && (
+                  <div className="flex-1">
+                    <Field label="RICE score">
+                      <p className="text-sm text-gray-600 py-2">{card.rice.score}</p>
+                    </Field>
+                  </div>
+                )}
+              </div>
+
+              {card.user_story !== undefined && (
+                <Field label="User story">
+                  <textarea rows={2} value={userStory} onChange={(e) => setUserStory(e.target.value)} className={inputCls} />
+                </Field>
+              )}
+
+              {card.what_breaks !== undefined && (
+                <Field label="What breaks">
+                  <textarea rows={2} value={whatBreaks} onChange={(e) => setWhatBreaks(e.target.value)} className={inputCls} />
+                </Field>
+              )}
+
+              {card.problem !== undefined && (
+                <Field label="Problem">
+                  <textarea rows={2} value={problem} onChange={(e) => setProblem(e.target.value)} className={inputCls} />
+                </Field>
+              )}
+
+              {card.done_when !== undefined && (
+                <Field label="Done when">
+                  <textarea rows={2} value={doneWhen} onChange={(e) => setDoneWhen(e.target.value)} className={inputCls} />
+                </Field>
+              )}
+
+              {card.success_metric !== undefined && (
+                <Field label="Success metric">
+                  <textarea rows={2} value={successMetric} onChange={(e) => setSuccessMetric(e.target.value)} className={inputCls} />
+                </Field>
+              )}
+
+              {card.next_step !== undefined && (
+                <Field label="Next step">
+                  <textarea rows={2} value={nextStep} onChange={(e) => setNextStep(e.target.value)} className={inputCls} />
+                </Field>
+              )}
+
+              {criteria.length > 0 && (
+                <Field label="Acceptance criteria">
+                  <div className="space-y-1.5">
+                    {criteria.map((ac, i) => (
+                      <div key={i} className="flex gap-2">
+                        <input type="text" value={ac}
+                          onChange={(e) => setCriteria(criteria.map((c, j) => j === i ? e.target.value : c))}
+                          className={inputCls} />
+                        <button onClick={() => setCriteria(criteria.filter((_, j) => j !== i))}
+                          className="text-gray-300 hover:text-red-400 text-lg leading-none shrink-0">×</button>
+                      </div>
+                    ))}
+                    <button onClick={() => setCriteria([...criteria, ""])}
+                      className="text-xs text-blue-500 hover:text-blue-700">+ Add criterion</button>
+                  </div>
+                </Field>
+              )}
+
+              <Field label="Supporting feedbacks">
+                <div className="space-y-1.5">
+                  {feedbacks.map((fb, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input type="text" value={fb}
+                        onChange={(e) => setFeedbacks(feedbacks.map((f, j) => j === i ? e.target.value : f))}
+                        className={inputCls} />
+                      <button onClick={() => setFeedbacks(feedbacks.filter((_, j) => j !== i))}
+                        className="text-gray-300 hover:text-red-400 text-lg leading-none shrink-0">×</button>
+                    </div>
+                  ))}
+                  <button onClick={() => setFeedbacks([...feedbacks, ""])}
+                    className="text-xs text-blue-500 hover:text-blue-700">+ Add feedback</button>
+                </div>
+              </Field>
+
+              {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+              <button onClick={sendToJira} disabled={loading || !title.trim()}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium disabled:opacity-50 hover:bg-blue-700 transition-colors">
                 {loading ? "Sending…" : "Send to Jira →"}
               </button>
             </div>
