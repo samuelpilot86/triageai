@@ -113,7 +113,8 @@ The image compression ruins quality, photos look pixelated
 Absolutely the best app in this category, nothing comes close
 The monthly price went up but no new features were added
 Graph data export to Excel doesn't preserve formatting
-The accessibility features for VoiceOver users are exemplary`;
+The accessibility features for VoiceOver users are exemplary
+The app logs me out automatically after 5 minutes, even mid-session`;
 
 const TAB_META: Record<Tab, { label: string; icon: React.ReactNode }> = {
   store: {
