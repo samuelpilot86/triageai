@@ -34,6 +34,7 @@ function JiraButton({ card }: { card: UserStoryCard }) {
   const [doneWhen, setDoneWhen] = useState(card.done_when ?? "");
   const [successMetric, setSuccessMetric] = useState(card.success_metric ?? "");
   const [nextStep, setNextStep] = useState(card.next_step ?? "");
+  const [riceScore, setRiceScore] = useState<number>(card.rice?.score ?? 0);
   const [criteria, setCriteria] = useState<string[]>(card.acceptance_criteria ?? []);
   const [feedbacks, setFeedbacks] = useState<string[]>(
     (card.feedbacks ?? []).map((f) => (typeof f === "string" ? f : f.text))
@@ -48,6 +49,7 @@ function JiraButton({ card }: { card: UserStoryCard }) {
     setDoneWhen(card.done_when ?? "");
     setSuccessMetric(card.success_metric ?? "");
     setNextStep(card.next_step ?? "");
+    setRiceScore(card.rice?.score ?? 0);
     setCriteria(card.acceptance_criteria ?? []);
     setFeedbacks((card.feedbacks ?? []).map((f) => (typeof f === "string" ? f : f.text)));
     setError(null);
@@ -68,6 +70,7 @@ function JiraButton({ card }: { card: UserStoryCard }) {
       next_step: nextStep || undefined,
       acceptance_criteria: criteria.filter(Boolean),
       feedbacks: feedbacks.filter(Boolean).map((t) => ({ text: t })),
+      rice: card.rice ? { ...card.rice, score: riceScore } : undefined,
     };
     try {
       const resp = await fetch(`${API_BASE}/api/jira/create-issue`, {
@@ -133,7 +136,13 @@ function JiraButton({ card }: { card: UserStoryCard }) {
                 {card.rice && (
                   <div className="flex-1">
                     <Field label="RICE score">
-                      <p className="text-sm text-gray-600 py-2">{card.rice.score}</p>
+                      <input
+                        type="number"
+                        min={0}
+                        value={riceScore}
+                        onChange={(e) => setRiceScore(Number(e.target.value))}
+                        className={inputCls}
+                      />
                     </Field>
                   </div>
                 )}
