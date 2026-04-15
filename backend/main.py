@@ -257,6 +257,106 @@ async def search_apps(store: str = Query("googleplay"), q: str = Query(...)):
     return {"apps": apps}
 
 
+@app.post("/api/jira/create-issue")
+async def create_jira_issue(payload: dict):
+    """Create a Jira issue from a sprint card. Credentials from env vars."""
+    import base64
+    import httpx
+
+    domain = os.environ.get("JIRA_DOMAIN", "triage-mvp.atlassian.net")
+    email = os.environ.get("JIRA_EMAIL", "samuelpilotbasse@gmail.com")
+    token = os.environ.get("JIRA_API_TOKEN", "")
+    project_key = os.environ.get("JIRA_PROJECT_KEY", "SCRUM")
+
+    if not token:
+        raise HTTPException(status_code=500, detail="JIRA_API_TOKEN not configured.")
+
+    credentials = base64.b64encode(f"{email}:{token}".encode()).decode()
+    headers = {
+        "Authorization": f"Basic {credentials}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+
+    # Map trIAge priority to Jira priority
+    priority_map = {"High": "High", "Medium": "Medium", "Low": "Low"}
+    jira_priority = priority_map.get(payload.get("priority", "Medium"), "Medium")
+
+    # Map action_type to Jira issue type
+    type_map = {
+        "bug": "Bug",
+        "performance": "Bug",
+        "feature": "Story",
+        "ux": "Story",
+        "pricing": "Task",
+        "ai_quality": "Story",
+        "other": "Task",
+    }
+    issue_type = type_map.get(payload.get("action_type", "other"), "Task")
+
+    # Build description in Jira Atlassian Document Format (ADF)
+    desc_content = []
+
+    if payload.get("user_story"):
+        desc_content += [
+            {"type": "paragraph", "content": [{"type": "text", "text": "User story", "marks": [{"type": "strong"}]}]},
+            {"type": "paragraph", "content": [{"type": "text", "text": payload["user_story"]}]},
+        ]
+
+    if payload.get("what_breaks"):
+        desc_content += [
+            {"type": "paragraph", "content": [{"type": "text", "text": "What breaks", "marks": [{"type": "strong"}]}]},
+            {"type": "paragraph", "content": [{"type": "text", "text": payload["what_breaks"]}]},
+        ]
+
+    if payload.get("acceptance_criteria"):
+        items = [{"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": ac}]}]} for ac in payload["acceptance_criteria"]]
+        desc_content += [
+            {"type": "paragraph", "content": [{"type": "text", "text": "Acceptance criteria", "marks": [{"type": "strong"}]}]},
+            {"type": "bulletList", "content": items},
+        ]
+
+    if payload.get("next_step"):
+        desc_content += [
+            {"type": "paragraph", "content": [{"type": "text", "text": "Next step", "marks": [{"type": "strong"}]}]},
+            {"type": "paragraph", "content": [{"type": "text", "text": payload["next_step"]}]},
+        ]
+
+    if payload.get("rice"):
+        rice = payload["rice"]
+        rice_text = f"RICE score: {rice.get('score')} — Reach: {rice.get('reach')}, Impact: {rice.get('impact')}/3, Confidence: {int(rice.get('confidence', 0)*100)}%, Effort: {rice.get('effort_label')}"
+        desc_content.append({"type": "paragraph", "content": [{"type": "text", "text": rice_text, "marks": [{"type": "em"}]}]})
+
+    if payload.get("feedbacks"):
+        fb_items = [{"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": f['text'] if isinstance(f, dict) else f}]}]} for f in payload["feedbacks"][:3]]
+        desc_content += [
+            {"type": "paragraph", "content": [{"type": "text", "text": "Supporting feedbacks", "marks": [{"type": "strong"}]}]},
+            {"type": "bulletList", "content": fb_items},
+        ]
+
+    jira_payload = {
+        "fields": {
+            "project": {"key": project_key},
+            "summary": payload.get("action", "Untitled"),
+            "description": {"type": "doc", "version": 1, "content": desc_content or [{"type": "paragraph", "content": [{"type": "text", "text": "Created by trIAge."}]}]},
+            "issuetype": {"name": issue_type},
+            "priority": {"name": jira_priority},
+        }
+    }
+
+    url = f"https://{domain}/rest/api/3/issue"
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(url, json=jira_payload, headers=headers, timeout=15)
+
+    if resp.status_code not in (200, 201):
+        raise HTTPException(status_code=resp.status_code, detail=resp.text)
+
+    data = resp.json()
+    issue_key = data.get("key")
+    issue_url = f"https://{domain}/browse/{issue_key}"
+    return {"key": issue_key, "url": issue_url}
+
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
