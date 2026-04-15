@@ -1,6 +1,92 @@
 "use client";
 
+import { useState } from "react";
 import { UserStoryCard, ActionType, RiceScore, SprintFeedback } from "@/lib/types";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7860";
+
+// ------------------------------------------------------------------
+// Jira button with confirmation modal
+// ------------------------------------------------------------------
+
+function JiraButton({ card }: { card: UserStoryCard }) {
+  const [showModal, setShowModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{ key: string; url: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function sendToJira() {
+    setLoading(true);
+    setError(null);
+    try {
+      const resp = await fetch(`${API_BASE}/api/jira/create-issue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(card),
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+      const data = await resp.json();
+      setResult(data);
+      setShowModal(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (result) {
+    return (
+      <a
+        href={result.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+      >
+        <img src="https://www.atlassian.com/favicon.ico" className="w-3 h-3" alt="" />
+        {result.key} ↗
+      </a>
+    );
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => setShowModal(true)}
+        className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-600 transition-colors"
+      >
+        <img src="https://www.atlassian.com/favicon.ico" className="w-3 h-3" alt="" />
+        Create Jira ticket
+      </button>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4 space-y-4">
+            <h3 className="text-sm font-semibold text-gray-900">Create Jira ticket</h3>
+            <div className="space-y-2 text-xs text-gray-600">
+              <div><span className="font-medium text-gray-500">Title</span><p className="mt-0.5 text-gray-800 font-medium">{card.action}</p></div>
+              <div><span className="font-medium text-gray-500">Type</span><p className="mt-0.5">{card.action_type}</p></div>
+              {card.rice && <div><span className="font-medium text-gray-500">RICE score</span><p className="mt-0.5">{card.rice.score}</p></div>}
+              {card.user_story && <div><span className="font-medium text-gray-500">User story</span><p className="mt-0.5">{card.user_story}</p></div>}
+              {card.next_step && <div><span className="font-medium text-gray-500">Next step</span><p className="mt-0.5">{card.next_step}</p></div>}
+            </div>
+            {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => { setShowModal(false); setError(null); }} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+              <button
+                onClick={sendToJira}
+                disabled={loading}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium disabled:opacity-50 hover:bg-blue-700 transition-colors"
+              >
+                {loading ? "Sending…" : "Send to Jira →"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 // ------------------------------------------------------------------
 // Type metadata
@@ -171,9 +257,10 @@ export default function UserStoryCards({ cards }: { cards: UserStoryCard[] }) {
                   </span>
                   <span className="text-sm font-semibold text-gray-900 truncate">{card.action}</span>
                 </div>
-                {/* RICE score */}
+                {/* Jira button + RICE score */}
                 {card.rice && (
-                  <div className="shrink-0 flex items-center gap-1.5">
+                  <div className="shrink-0 flex items-center gap-3">
+                    <JiraButton card={card} />
                     <span className="text-xs text-gray-400 font-medium">RICE</span>
                     <span className="text-lg font-bold text-gray-900 leading-none">{card.rice.score}</span>
                   </div>
