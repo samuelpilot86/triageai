@@ -172,8 +172,9 @@ async def fetch_googleplay_top_apps(category: str, count: int = 10) -> list[dict
                 "name": r["title"],
                 "store": "googleplay",
             }
-            for r in results[:count]
-        ]
+            for r in results
+            if r.get("appId") and r.get("title")
+        ][:count]
         _cache_set(cache_key, apps)
         return apps
     except Exception:
@@ -196,8 +197,9 @@ async def search_googleplay_apps(query: str, count: int = 8) -> list[dict]:
         )
         return [
             {"id": r["appId"], "name": r["title"], "store": "googleplay"}
-            for r in results[:count]
-        ]
+            for r in results
+            if r.get("appId") and r.get("title")
+        ][:count]
     except Exception:
         return []
 
