@@ -29,7 +29,7 @@ const AGENTS = [
   },
   {
     emoji: "🖊️",
-    name: "Hugo",
+    name: "Penn",
     role: "Reporter",
     model: "Gemini 2.5 Flash",
     desc: "Synthesizes findings into a PM executive report",
@@ -37,7 +37,7 @@ const AGENTS = [
   },
   {
     emoji: "✨",
-    name: "Stella",
+    name: "Nova",
     role: "Backlog Builder",
     model: "Gemini 2.5 Flash",
     desc: "Generates RICE-scored sprint cards, ready for Jira",
@@ -59,13 +59,13 @@ const MODEL_ROUTING = [
     why: "Structured JSON classification — speed matters, creativity doesn't. Groq's inference hardware makes this step visibly faster, and its free tier is generous enough for batch processing.",
   },
   {
-    agent: "Hugo",
+    agent: "Penn",
     badge: "Gemini 2.5 Flash",
     badgeClass: "bg-indigo-100 text-indigo-800",
     why: "Narrative synthesis for a stakeholder-facing report. Language quality is directly visible to the end user — best available free-tier model for this task.",
   },
   {
-    agent: "Stella",
+    agent: "Nova",
     badge: "Gemini 2.5 Flash",
     badgeClass: "bg-indigo-100 text-indigo-800",
     why: "RICE scoring, user story format, acceptance criteria — requires PM domain understanding and structured output. Gemini Flash handles both well.",
@@ -78,7 +78,7 @@ const INTEGRATIONS = [
     name: "App Store",
     type: "Input · iTunes Search API",
     typeClass: "text-indigo-600",
-    desc: "Browse top apps by category or search by name. Fetches up to 100 recent reviews live, without authentication.",
+    desc: "Browse top apps by category or search by name. Fetches up to 50 reviews (Apple RSS feed hard limit).",
   },
   {
     icon: "▶️",
@@ -152,9 +152,12 @@ export default function AboutPage() {
           <h2 className="text-xl font-bold text-gray-900 mb-2">
             Four specialized agents, one coordinated pipeline
           </h2>
-          <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-            Each agent has a single, well-defined responsibility. Outputs feed sequentially into the next step —
-            no monolithic prompt, no guesswork about what the model is doing at any given moment.
+          <p className="text-sm text-gray-500 mb-3 leading-relaxed">
+            Each agent has a single, well-defined responsibility.
+            Because each step produces a discrete, inspectable output, it's straightforward to observe what
+            each agent actually did — useful for spotting errors, tuning prompts, or understanding failure modes.
+            It also lays the groundwork for automated testing: each step can be validated independently,
+            with assertions on the output format and content before the next agent is triggered.
           </p>
 
           {/* Agent cards */}
@@ -256,9 +259,10 @@ export default function AboutPage() {
 
           <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-600 leading-relaxed">
             <span className="font-semibold text-gray-900">Why it's efficient:</span>{" "}
-            A second agent reviewing Iris's output would double latency and quota usage. Structuring the
-            prompt in two explicit phases achieves similar precision in a single round-trip — a deliberate
-            choice over naive agent chaining.
+            A second agent reviewing Iris's output would mean a second API call — and Groq's free tier
+            enforces limits on both tokens per minute and number of requests. Structuring the prompt in two
+            explicit phases achieves similar precision in a single round-trip — a deliberate choice over
+            naive agent chaining.
           </div>
         </section>
 
@@ -269,7 +273,7 @@ export default function AboutPage() {
             Connected to where product data lives
           </h2>
           <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-            trIAge connects to two data sources and one delivery target — no manual copy-paste at any step.
+            trIAge connects to two data sources and one delivery target. The pipeline runs from raw store reviews to a Jira ticket without leaving the interface.
             The pipeline runs from raw store reviews to a Jira ticket without leaving the interface.
           </p>
 

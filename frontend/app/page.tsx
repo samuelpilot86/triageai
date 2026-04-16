@@ -79,8 +79,8 @@ export default function Home() {
               {[
                 { emoji: "🕸️", name: "Webb", role: "Web Scraper", model: "Python scraper", desc: "Pulls reviews from App Store & Google Play" },
                 { emoji: "🔬", name: "Iris", role: "Categorizer", model: "Groq · Llama 3.3 70B", desc: "Tags & prioritizes every feedback" },
-                { emoji: "🖊️", name: "Hugo", role: "Reporter", model: "Gemini 2.5 Flash", desc: "Writes the executive summary" },
-                { emoji: "✨", name: "Stella", role: "Backlog Builder", model: "Gemini 2.5 Flash", desc: "Generates sprint cards with RICE scoring" },
+                { emoji: "🖊️", name: "Penn", role: "Reporter", model: "Gemini 2.5 Flash", desc: "Writes the executive summary" },
+                { emoji: "✨", name: "Nova", role: "Backlog Builder", model: "Gemini 2.5 Flash", desc: "Generates sprint cards with RICE scoring" },
               ].map((a, i, arr) => (
                 <div key={a.name} className="flex items-center flex-1 min-w-0 gap-2">
                   <div className="flex-1 min-w-0 rounded-xl border border-gray-200 bg-white p-3 text-center">
