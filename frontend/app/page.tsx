@@ -11,7 +11,7 @@ import { useAnalysis } from "@/lib/useAnalysis";
 import { RotateCcw } from "lucide-react";
 
 export default function Home() {
-  const { step, partialItems, analyzeText, analyzeCsv, analyzeStore, reset } = useAnalysis();
+  const { step, partialItems, analyzeText, analyzeCsv, analyzeStore, reset, retry } = useAnalysis();
   const resultsRef = useRef<HTMLDivElement>(null);
   const pipelineMetaRef = useRef<{ scrapedCount?: number; nFeedbacks?: number }>({});
 
@@ -112,12 +112,32 @@ export default function Home() {
         )}
 
         {/* Error */}
-        {step.type === "error" && (
-          <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4 text-sm text-red-700">
-            <p className="font-medium">Analysis failed</p>
-            <p className="text-xs mt-1 opacity-80">{step.message}</p>
-          </div>
-        )}
+        {step.type === "error" && (() => {
+          const msg = step.message || "";
+          const isTransient = /503|UNAVAILABLE|high demand|rate.?limit|try again/i.test(msg);
+          const friendly = isTransient
+            ? "The AI model is temporarily overloaded. This usually clears up within a minute."
+            : "Something went wrong during the analysis.";
+          return (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4 text-sm text-red-700">
+              <p className="font-medium">Analysis failed</p>
+              <p className="text-xs mt-1 opacity-80">{friendly}</p>
+              <div className="flex items-center gap-3 mt-3">
+                <button
+                  onClick={() => retry()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Retry
+                </button>
+                <details className="text-xs opacity-70">
+                  <summary className="cursor-pointer hover:opacity-100">Technical details</summary>
+                  <pre className="mt-2 whitespace-pre-wrap break-all font-mono text-[10px]">{msg}</pre>
+                </details>
+              </div>
+            </div>
+          );
+        })()}
 
         <div ref={resultsRef} className="space-y-10">
           {/* 1 — Agent pipeline */}

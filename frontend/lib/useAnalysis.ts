@@ -111,6 +111,7 @@ export function useAnalysis() {
   const categorizationStartRef = useRef<number | null>(null);
   const reportStartRef = useRef<number | null>(null);
   const nFeedbacksRef = useRef<number>(0);
+  const lastCallRef = useRef<(() => (() => void) | Promise<() => void>) | null>(null);
 
   const reset = useCallback(() => {
     setStep({ type: "idle" });
@@ -201,7 +202,7 @@ export function useAnalysis() {
   }, []);
 
   const analyzeText = useCallback((feedbacks: string[]) => {
-    return startCategorization(feedbacks.length, () =>
+    const call = () => startCategorization(feedbacks.length, () =>
       streamEvents(
         `${API_BASE}/api/analyze/text`,
         {
@@ -213,11 +214,13 @@ export function useAnalysis() {
         (e) => setStep({ type: "error", message: e.message })
       )
     );
+    lastCallRef.current = call;
+    return call();
   }, [handleEvents, startCategorization]);
 
   const analyzeCsv = useCallback((file: File) => {
     // CSV: we don't know n upfront, use 50 as estimate placeholder
-    return startCategorization(50, () => {
+    const call = () => startCategorization(50, () => {
       const form = new FormData();
       form.append("file", file);
       return streamEvents(
@@ -227,15 +230,20 @@ export function useAnalysis() {
         (e) => setStep({ type: "error", message: e.message })
       );
     });
+    lastCallRef.current = call;
+    return call();
   }, [handleEvents, startCategorization]);
 
   const analyzeStore = useCallback((app: AppEntry, store: Store, count: number = 100) => {
     // Store: scraping phase first, categorization estimate set when scraped arrives
-    setStep({ type: "scraping" });
-    setPartialItems([]);
-    categorizationStartRef.current = null;
-    nFeedbacksRef.current = count;
-    return streamEvents(
+    const call = () => {
+      setStep({ type: "scraping" });
+      setPartialItems([]);
+      categorizationStartRef.current = null;
+      nFeedbacksRef.current = count;
+      return streamEventsInner();
+    };
+    const streamEventsInner = () => streamEvents(
       `${API_BASE}/api/analyze/store`,
       {
         method: "POST",
@@ -257,7 +265,13 @@ export function useAnalysis() {
       },
       (e) => setStep({ type: "error", message: e.message })
     );
+    lastCallRef.current = call;
+    return call();
   }, [handleEvents]);
 
-  return { step, partialItems, analyzeText, analyzeCsv, analyzeStore, reset };
+  const retry = useCallback(() => {
+    if (lastCallRef.current) return lastCallRef.current();
+  }, []);
+
+  return { step, partialItems, analyzeText, analyzeCsv, analyzeStore, reset, retry };
 }

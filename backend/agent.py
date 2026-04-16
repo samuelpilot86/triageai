@@ -129,8 +129,10 @@ IMPORTANT RULES FOR CORRECTIONS:
     async def _call_llm_iris(self, prompt: str, n_feedbacks: int | None = None) -> str:
         """
         Groq-primary LLM call for Iris (categorization).
-        Tries Groq/Llama 3.3 70B first; falls back to Gemini if Groq is unavailable or fails.
+        Tries Groq/Llama 3.3 70B first; falls back to Gemini (with retries on 503) if Groq fails.
         """
+        import asyncio as _asyncio
+
         if self.groq_client:
             n = n_feedbacks or 25
             max_tokens = min(
@@ -148,11 +150,23 @@ IMPORTANT RULES FOR CORRECTIONS:
             except Exception:
                 pass  # fall through to Gemini
 
-        # Gemini fallback
-        response = await self.client.aio.models.generate_content(
-            model=PRIMARY_MODEL, contents=prompt
-        )
-        return self._extract_text(response)
+        # Gemini fallback — with retries on transient 503/UNAVAILABLE
+        last_error: Exception | None = None
+        for attempt in range(3):  # 1 initial + 2 retries
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=PRIMARY_MODEL, contents=prompt
+                )
+                return self._extract_text(response)
+            except Exception as e:
+                last_error = e
+                error_str = str(e)
+                is_retryable = "503" in error_str or "UNAVAILABLE" in error_str or "high demand" in error_str.lower()
+                if is_retryable and attempt < 2:
+                    await _asyncio.sleep(2 ** attempt)  # 1s, 2s
+                    continue
+                raise
+        raise last_error  # type: ignore[misc]
 
     async def _categorize_chunked(
         self, feedbacks: list[str], chunk_size: int
