@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Upload, ChevronDown, ClipboardList, FileSpreadsheet, Star, Zap, Search, Loader2 } from "lucide-react";
 import { Store, AppEntry } from "@/lib/types";
+import { DEMO_FEEDBACKS } from "@/lib/demoFeedbacks";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7860";
 
@@ -15,106 +16,6 @@ interface Props {
   disabled?: boolean;
 }
 
-const SAMPLE_FEEDBACKS = `The app crashes every time I try to open it after the latest update
-Dark mode is missing and my eyes hurt using it at night
-Loading times are way too slow, sometimes takes 10+ seconds
-Love the new dashboard design, it's so much cleaner
-Notifications keep showing up even after I disabled them
-The search bar doesn't work properly, results are always wrong
-Please add a widget for the home screen, would be super useful
-Can't export my data to PDF, the button does nothing
-The app randomly logs me out every few hours, very frustrating
-Great app overall but the onboarding is confusing for new users
-The premium plan is way too expensive for what it offers
-Fingerprint login stopped working after iOS 17 update
-I love how fast the sync is between devices, excellent feature
-Charts are impossible to read on small screens
-Would love a collaborative mode to share projects with teammates
-The undo button doesn't always work, lost my work twice
-Battery drain is insane, kills 30% in an hour just running in background
-Excellent customer support, they solved my issue in minutes
-The calendar integration with Google is broken since last week
-Font size is too small and there's no way to change it
-Please add offline mode, useless without internet
-The free tier is too limited, only 5 items is ridiculous
-App froze completely during a presentation, very embarrassing
-Love the autosave feature, saved me from losing work many times
-Tags and filters are confusing, took me a week to understand
-Why does the app need access to my contacts and microphone?
-The AI suggestions are surprisingly accurate and helpful
-Sync fails silently — no error message, data just disappears
-The iPad layout is terrible, everything looks stretched
-Please add keyboard shortcuts for power users
-I switched from the competitor and this is significantly better
-The color themes are beautiful but I want to create custom ones
-Payment failed but I was still charged, need a refund
-The map feature is laggy and the pins load slowly
-Love the weekly summary emails, very motivating
-The tutorial skips too fast and can't be replayed
-Push notifications arrive 30 minutes late, completely useless
-Onboarding walkthrough was clear and well designed
-The widget crashes the home screen on Android 13
-CSV import doesn't handle special characters like é or ü
-Can you add a passcode lock for privacy?
-The graph animations are smooth and really polished
-Autocomplete suggestions are often irrelevant and annoying
-Storage limit reached with no warning, lost unsaved data
-The new update broke the dark mode completely
-I'd pay more for a family plan option
-App size is 800MB which is absurd for what it does
-The voice input feature is a game changer, love it
-Recurring tasks don't reset correctly after completion
-The help documentation is outdated and missing many features
-App took 3 minutes to load this morning, something is wrong
-Love the Siri shortcut integration, works perfectly
-The sharing feature posts to wrong account sometimes
-Streak tracking is super motivating, great addition
-Can't attach files larger than 5MB, this limit is too low
-The desktop web version is much better than the mobile app
-Login with Apple doesn't work, always shows an error
-The monthly report is beautiful and very actionable
-Need a batch delete option, deleting one by one is painful
-The map doesn't show my current location accurately
-Excellent app, I recommend it to all my colleagues
-The color contrast is poor, hard to read for colorblind users
-Crashes on Android 12 every time I use the camera feature
-The price increase from $5 to $12 is not justified
-Real-time collaboration works flawlessly, impressive engineering
-The search doesn't find items by tags, only by title
-Would love an Apple Watch companion app
-The loading spinner shows forever on slow connections
-I lost all my data after reinstalling the app, no backup warning
-The haptic feedback is satisfying and well-tuned
-Two-factor authentication setup is overly complicated
-The API integration with Zapier is broken since v3.2
-Simple and intuitive, my whole team adopted it in one day
-The free trial is too short — 3 days is not enough to evaluate
-Background refresh drains battery extremely fast
-The drag and drop reordering is smooth and responsive
-Please add a trash/recycle bin before deleting permanently
-The app grammar checker is excellent, catches subtle errors
-Analytics dashboard doesn't load on Firefox
-Can't cancel my subscription from within the app, must use website
-The new icon is ugly, please bring back the old one
-Reminders don't fire when the phone is on silent mode
-The recent redesign is gorgeous and feels premium
-Import from Notion is broken, files come in with wrong formatting
-Sorting options are too limited, need more criteria
-The app doesn't remember my scroll position when switching tabs
-Love the community feature, met many useful connections
-The mandatory account creation to try the app is a dealbreaker
-Response time from in-app chat support is under 5 minutes, wow
-The location-based reminders work perfectly, very reliable
-Duplicating a project copies everything except the attachments
-Need a proper Windows desktop app, the web version is not enough
-The AI writing assistant suggestions are hit or miss
-Switching between accounts is clunky and takes too many taps
-The image compression ruins quality, photos look pixelated
-Absolutely the best app in this category, nothing comes close
-The monthly price went up but no new features were added
-Graph data export to Excel doesn't preserve formatting
-The accessibility features for VoiceOver users are exemplary
-The app logs me out automatically after 5 minutes, even mid-session`;
 
 const TAB_META: Record<Tab, { label: string; icon: React.ReactNode }> = {
   store: {
@@ -308,13 +209,13 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
         <div className="space-y-3">
           <textarea
             readOnly
-            value={SAMPLE_FEEDBACKS}
+            value={DEMO_FEEDBACKS}
             className="w-full h-52 px-4 py-3 text-sm rounded-xl border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-500"
           />
           <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">100 sample feedbacks</span>
+            <span className="text-xs text-gray-400">100 real reviews from Doctolib Pro (Google Play, fr-FR)</span>
             <button
-              onClick={() => onAnalyzeText(SAMPLE_FEEDBACKS.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 200))}
+              onClick={() => onAnalyzeText(DEMO_FEEDBACKS.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 200))}
               disabled={disabled}
               className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-indigo-700 transition-colors shadow-sm"
             >
