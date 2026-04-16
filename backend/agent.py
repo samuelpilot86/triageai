@@ -440,6 +440,14 @@ Return ONLY a valid JSON array, no markdown, no surrounding text:
             cards = json.loads(clean)
             if not isinstance(cards, list):
                 raise ValueError
+            # Strip redundant English→English "translation" fields
+            def _norm(s: str) -> str:
+                return re.sub(r"[^a-z0-9]+", " ", s.lower()).strip()
+            for card in cards:
+                for fb in card.get("feedbacks", []) or []:
+                    tr = fb.get("translation")
+                    if tr and _norm(tr) == _norm(fb.get("text", "")):
+                        fb.pop("translation", None)
             # Sort by RICE score descending
             cards.sort(key=lambda c: c.get("rice", {}).get("score", 0), reverse=True)
         except Exception as e:
