@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Link from "next/link";
 import InputPanel from "@/components/InputPanel";
 import FeedbackTable from "@/components/FeedbackTable";
 import { ExecutiveReport, FeedbackStats, FallbackBanner, IrisCorrections } from "@/components/ReportPanel";
@@ -44,15 +45,20 @@ export default function Home() {
               <p className="text-xs text-gray-400">Product feedback triage for PMs, powered by AI agents</p>
             </div>
           </div>
-          {step.type !== "idle" && (
-            <button
-              onClick={reset}
-              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              New analysis
-            </button>
-          )}
+          <div className="flex items-center gap-4">
+            <Link href="/about" className="text-xs text-gray-400 hover:text-indigo-600 transition-colors">
+              Under the hood
+            </Link>
+            {step.type !== "idle" && (
+              <button
+                onClick={reset}
+                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                New analysis
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
