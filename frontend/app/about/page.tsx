@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata: Metadata = {
-  title: "trIAge — Under the hood",
+  title: "trIAge — How it's built",
   description:
     "Architecture, model routing, and integration decisions behind trIAge.",
 };
@@ -130,7 +130,7 @@ export default function AboutPage() {
         {/* ── Hero ── */}
         <section>
           <div className="inline-block bg-indigo-50 text-indigo-600 text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-md mb-5">
-            Under the hood
+            🔧 How it&apos;s built
           </div>
           <h1 className="text-3xl font-extrabold text-gray-900 leading-tight mb-4">
             An agentic AI pipeline,<br />connected to real systems

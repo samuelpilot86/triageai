@@ -46,8 +46,11 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/about" className="text-xs text-gray-400 hover:text-indigo-600 transition-colors">
-              Under the hood
+            <Link
+              href="/about"
+              className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 border border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              🔧 How it&apos;s built
             </Link>
             {step.type !== "idle" && (
               <button
