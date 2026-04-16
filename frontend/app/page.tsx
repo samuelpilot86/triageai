@@ -59,14 +59,15 @@ export default function Home() {
           <section className="space-y-6">
             <div className="space-y-2">
               <h2 className="text-2xl font-bold text-gray-900">Triage your app reviews in seconds</h2>
-              <p className="text-sm text-gray-500 max-w-xl">
+              <p className="text-sm text-gray-500">
                 Pull directly from the App Store or Google Play reviews, upload a CSV, paste feedback, or use our demo feedback samples.
                 Your AI agents will categorize, prioritize, and turn them into sprint-ready cards.
               </p>
             </div>
 
             {/* How it works */}
-            <div className="grid grid-cols-4 gap-0 max-w-2xl">
+            <div className="flex justify-center">
+            <div className="grid grid-cols-4 gap-0 w-[480px]">
               {[
                 { n: 1, title: "Scrape", desc: "Pull reviews from App Store or Google Play" },
                 { n: 2, title: "Categorize", desc: "AI agents tag, score & prioritize" },
@@ -84,6 +85,7 @@ export default function Home() {
                   <div className="text-[11px] text-gray-400 leading-snug">{s.desc}</div>
                 </div>
               ))}
+            </div>
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-200 p-6">
