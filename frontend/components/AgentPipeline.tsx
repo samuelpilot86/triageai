@@ -182,7 +182,7 @@ function AgentCard({
         flex-1 min-w-0 rounded-xl border p-4 transition-all duration-500
         ${isActive ? "border-indigo-300 bg-indigo-50 shadow-sm shadow-indigo-100" : ""}
         ${isDone ? "border-emerald-200 bg-emerald-50" : ""}
-        ${isWaiting ? "border-gray-200 bg-white opacity-50" : ""}
+        ${isWaiting ? "border-gray-200 bg-white" : ""}
       `}
     >
       {/* Header row */}
@@ -190,10 +190,10 @@ function AgentCard({
         <div className="flex items-center gap-2">
           <span className="text-xl leading-none">{agent.emoji}</span>
           <div>
-            <p className={`text-sm font-semibold leading-tight ${isActive ? "text-indigo-700" : isDone ? "text-emerald-700" : "text-gray-400"}`}>
+            <p className={`text-sm font-semibold leading-tight ${isActive ? "text-indigo-700" : isDone ? "text-emerald-700" : "text-gray-700"}`}>
               {agent.name}
             </p>
-            <p className={`text-xs leading-tight ${isActive ? "text-indigo-500" : isDone ? "text-emerald-600" : "text-gray-400"}`}>
+            <p className={`text-xs leading-tight ${isActive ? "text-indigo-500" : isDone ? "text-emerald-600" : "text-gray-500"}`}>
               {agent.role}
             </p>
           </div>
@@ -213,7 +213,7 @@ function AgentCard({
           <span className={`inline-block text-xs px-1.5 py-0.5 rounded font-mono ${
             isActive ? "bg-indigo-100 text-indigo-600" :
             isDone ? "bg-emerald-100 text-emerald-600" :
-            "bg-gray-100 text-gray-400"
+            "bg-gray-100 text-gray-500"
           }`}>
             {agent.model}
           </span>
@@ -224,7 +224,7 @@ function AgentCard({
           <span className={`inline-block text-xs px-1.5 py-0.5 rounded font-mono ${
             isActive ? "bg-indigo-100 text-indigo-600" :
             isDone ? "bg-emerald-100 text-emerald-600" :
-            "bg-gray-100 text-gray-400"
+            "bg-gray-100 text-gray-500"
           }`}>
             Python scraper
           </span>

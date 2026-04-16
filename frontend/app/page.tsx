@@ -65,27 +65,26 @@ export default function Home() {
               </p>
             </div>
 
-            {/* How it works */}
-            <div className="flex justify-center">
-            <div className="grid grid-cols-4 gap-0 w-[480px]">
+            {/* Agent pipeline preview */}
+            <div className="flex items-stretch gap-2">
               {[
-                { n: 1, title: "Scrape", desc: "Pull reviews from App Store or Google Play" },
-                { n: 2, title: "Categorize", desc: "AI agents tag, score & prioritize" },
-                { n: 3, title: "Report", desc: "Executive summary for stakeholders" },
-                { n: 4, title: "Push to Jira", desc: "RICE-scored sprint cards, one click" },
-              ].map((s, i, arr) => (
-                <div key={s.n} className="relative text-center px-2">
-                  {i < arr.length - 1 && (
-                    <span className="absolute right-0 top-3 text-gray-300 text-sm">→</span>
-                  )}
-                  <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-xs font-bold text-indigo-500 mx-auto mb-2">
-                    {s.n}
+                { emoji: "🕸️", name: "Webb", role: "Web Scraper", desc: "Pulls reviews from App Store & Google Play" },
+                { emoji: "🔬", name: "Iris", role: "Categorizer", desc: "Tags, scores & prioritizes every feedback" },
+                { emoji: "🖊️", name: "Hugo", role: "Reporter", desc: "Writes the executive summary" },
+                { emoji: "✨", name: "Stella", role: "Backlog Builder", desc: "Generates sprint cards with RICE scoring" },
+              ].map((a, i, arr) => (
+                <div key={a.name} className="flex items-center flex-1 min-w-0 gap-2">
+                  <div className="flex-1 min-w-0 rounded-xl border border-gray-200 bg-white p-3 text-center">
+                    <div className="text-xl mb-1">{a.emoji}</div>
+                    <div className="text-xs font-semibold text-gray-800">{a.name}</div>
+                    <div className="text-[10px] text-indigo-500 font-medium mb-1">{a.role}</div>
+                    <div className="text-[10px] text-gray-400 leading-snug">{a.desc}</div>
                   </div>
-                  <div className="text-xs font-semibold text-gray-800 mb-0.5">{s.title}</div>
-                  <div className="text-[11px] text-gray-400 leading-snug">{s.desc}</div>
+                  {i < arr.length - 1 && (
+                    <span className="shrink-0 text-gray-300 text-sm">→</span>
+                  )}
                 </div>
               ))}
-            </div>
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-200 p-6">
