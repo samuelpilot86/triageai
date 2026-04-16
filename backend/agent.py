@@ -1,7 +1,12 @@
 """
 agent.py — Core logic of the product feedback triage agent.
-Uses Google Gemini 2.5 Flash as primary model, with Groq (Llama 3.3 70B)
-as automatic fallback when the Gemini free-tier quota is exhausted.
+
+Model routing:
+  - Iris  (categorization) : Groq / Llama 3.3 70B as primary — fast structured JSON,
+                             falls back to Gemini if Groq is unavailable.
+  - Hugo  (report)         : Gemini 2.5 Flash as primary — best free-tier quality
+                             for narrative synthesis, falls back to Groq.
+  - Stella (backlog cards) : Gemini 2.5 Flash as primary, falls back to Groq.
 """
 
 import json
@@ -121,11 +126,40 @@ IMPORTANT RULES FOR CORRECTIONS:
 - If a field needed no change, do NOT include it in corrections at all.
 - If no fields needed changing, return "corrections": []."""
 
+    async def _call_llm_iris(self, prompt: str, n_feedbacks: int | None = None) -> str:
+        """
+        Groq-primary LLM call for Iris (categorization).
+        Tries Groq/Llama 3.3 70B first; falls back to Gemini if Groq is unavailable or fails.
+        """
+        if self.groq_client:
+            n = n_feedbacks or 25
+            max_tokens = min(
+                FALLBACK_MODEL_MAX_TOKENS,
+                _TOKENS_OVERHEAD + n * _TOKENS_PER_FEEDBACK,
+            )
+            try:
+                response = await self.groq_client.chat.completions.create(
+                    model=FALLBACK_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.2,
+                    max_tokens=max_tokens,
+                )
+                return response.choices[0].message.content
+            except Exception:
+                pass  # fall through to Gemini
+
+        # Gemini fallback
+        response = await self.client.aio.models.generate_content(
+            model=PRIMARY_MODEL, contents=prompt
+        )
+        return self._extract_text(response)
+
     async def _categorize_chunked(
         self, feedbacks: list[str], chunk_size: int
     ) -> tuple[list[dict], list[dict]]:
         """
-        Processes feedbacks in chunks to stay within Groq TPM limits.
+        Processes feedbacks in chunks (Groq TPM limit = 25/chunk).
+        Uses Groq as primary per chunk, Gemini as fallback.
         Merges results and re-sequences IDs globally.
         """
         all_items: list[dict] = []
@@ -135,9 +169,7 @@ IMPORTANT RULES FOR CORRECTIONS:
         for i in range(0, len(feedbacks), chunk_size):
             chunk = feedbacks[i : i + chunk_size]
             prompt = self._build_categorization_prompt(chunk)
-            text, _ = await self._call_llm(
-                prompt, n_feedbacks=len(chunk), _force_groq=True
-            )
+            text = await self._call_llm_iris(prompt, n_feedbacks=len(chunk))
             data = self._parse_json_response(text)
             chunk_items = data.get("feedbacks", [])
             chunk_corrections = [
@@ -237,34 +269,12 @@ IMPORTANT RULES FOR CORRECTIONS:
         self, feedbacks: list[str]
     ) -> tuple[list[dict], list[dict], bool]:
         """
-        Categorizes feedbacks AND self-corrects in a single LLM call.
-        Returns (final_items, corrections_list, used_fallback).
+        Categorizes feedbacks AND self-corrects.
+        Iris always uses Groq/Llama 3.3 70B (chunked) as primary model.
+        Returns (final_items, corrections_list, used_fallback=False — Groq is intentional).
         """
-        prompt = self._build_categorization_prompt(feedbacks)
-
-        try:
-            text, used_fallback = await self._call_llm(prompt, n_feedbacks=len(feedbacks))
-            data = self._parse_json_response(text)
-            corrections = [
-                c for c in data.get("corrections", [])
-                if c.get("old_value") != c.get("new_value")
-            ]
-            return data.get("feedbacks", []), corrections, used_fallback
-        except Exception as e:
-            error_str = str(e)
-            is_quota = (
-                "429" in error_str
-                or "RESOURCE_EXHAUSTED" in error_str
-                or "413" in error_str
-                or "Request too large" in error_str
-                or "503" in error_str
-                or "UNAVAILABLE" in error_str
-                or "high demand" in error_str.lower()
-            )
-            if not is_quota or not self.groq_client:
-                raise
-            items, corrections = await self._categorize_chunked(feedbacks, GROQ_CHUNK_SIZE)
-            return items, corrections, True
+        items, corrections = await self._categorize_chunked(feedbacks, GROQ_CHUNK_SIZE)
+        return items, corrections, False
 
     # ------------------------------------------------------------------
     # Step 2: Executive report
