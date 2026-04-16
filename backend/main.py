@@ -200,11 +200,12 @@ async def analyze_store(body: dict):
         nonlocal feedbacks
         yield sse_event("status", {"step": "scraping", "message": f"Fetching reviews for {app_entry['name']}…"})
         try:
+            requested = int(body.get("count", 100))
             if store == "googleplay":
-                feedbacks = await fetch_play_store_reviews(app_entry["id"], count=100)
+                feedbacks = await fetch_play_store_reviews(app_entry["id"], count=min(requested, 200))
                 source = "Google Play"
             else:
-                feedbacks = await fetch_app_store_reviews(app_entry["id"], count=100)
+                feedbacks = await fetch_app_store_reviews(app_entry["id"], count=min(requested, 50))
                 source = "App Store"
         except Exception as e:
             yield sse_event("error", {"message": f"Scraping failed: {str(e)}"})
