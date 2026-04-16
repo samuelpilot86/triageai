@@ -37,9 +37,12 @@ export default function Home() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">trIAge</h1>
-            <p className="text-xs text-gray-400">Product feedback triage for PMs, powered by AI agents</p>
+          <div className="flex items-center gap-3">
+            <img src="/logo.jpg" alt="trIAge logo" className="w-9 h-9 rounded-xl" />
+            <div>
+              <h1 className="text-lg font-semibold text-gray-900">trIAge</h1>
+              <p className="text-xs text-gray-400">Product feedback triage for PMs, powered by AI agents</p>
+            </div>
           </div>
           {step.type !== "idle" && (
             <button
