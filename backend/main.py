@@ -159,8 +159,8 @@ async def analyze_text(body: dict):
     feedbacks = body.get("feedbacks", [])
     if not feedbacks or len(feedbacks) < 2:
         raise HTTPException(status_code=422, detail="At least 2 feedbacks required.")
-    if len(feedbacks) > 100:
-        feedbacks = feedbacks[:100]
+    if len(feedbacks) > 200:
+        feedbacks = feedbacks[:200]
     return StreamingResponse(analysis_stream(feedbacks), media_type="text/event-stream", headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
 
 
@@ -184,8 +184,8 @@ async def analyze_csv(file: UploadFile = File(...)):
 
     if len(feedbacks) < 2:
         raise HTTPException(status_code=422, detail="CSV must contain at least 2 feedbacks.")
-    if len(feedbacks) > 100:
-        feedbacks = feedbacks[:100]
+    if len(feedbacks) > 200:
+        feedbacks = feedbacks[:200]
 
     return StreamingResponse(analysis_stream(feedbacks), media_type="text/event-stream", headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
 
@@ -247,7 +247,7 @@ async def analyze_store(body: dict):
 
         yield sse_event("scraped", {"count": len(feedbacks), "source": source})
 
-        async for chunk in analysis_stream(feedbacks[:100]):
+        async for chunk in analysis_stream(feedbacks[:200]):
             yield chunk
 
     return StreamingResponse(stream(), media_type="text/event-stream", headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})

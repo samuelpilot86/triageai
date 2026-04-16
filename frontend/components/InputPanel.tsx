@@ -255,10 +255,10 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-400">
               {feedbacks.length} feedback{feedbacks.length !== 1 ? "s" : ""}
-              {feedbacks.length > 100 && " — first 100 will be analyzed"}
+              {feedbacks.length > 200 && " — first 200 will be analyzed"}
             </span>
             <button
-              onClick={() => onAnalyzeText(feedbacks.slice(0, 100))}
+              onClick={() => onAnalyzeText(feedbacks.slice(0, 200))}
               disabled={!canSubmitText}
               className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-indigo-700 transition-colors shadow-sm"
             >
@@ -314,7 +314,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-400">100 sample feedbacks</span>
             <button
-              onClick={() => onAnalyzeText(SAMPLE_FEEDBACKS.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 100))}
+              onClick={() => onAnalyzeText(SAMPLE_FEEDBACKS.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 200))}
               disabled={disabled}
               className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-indigo-700 transition-colors shadow-sm"
             >
