@@ -114,8 +114,11 @@ export default function Home() {
         {/* Error */}
         {step.type === "error" && (() => {
           const msg = step.message || "";
+          const isQuotaExhausted = /quota exhausted|429|RESOURCE_EXHAUSTED/i.test(msg);
           const isTransient = /503|UNAVAILABLE|high demand|rate.?limit|try again/i.test(msg);
-          const friendly = isTransient
+          const friendly = isQuotaExhausted
+            ? "Daily free-tier quota exhausted on both Groq and Gemini. Retry in a few minutes (Groq resets quickly) or tomorrow (Gemini resets at midnight Pacific)."
+            : isTransient
             ? "The AI model is temporarily overloaded. This usually clears up within a minute."
             : "Something went wrong during the analysis.";
           return (

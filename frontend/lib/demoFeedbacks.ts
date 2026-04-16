@@ -1,102 +1,102 @@
-// Auto-generated: 100 real Doctolib Pro reviews fetched from Google Play (fr-FR).
+// Auto-generated: 100 real ChatGPT reviews fetched from Google Play (en-US).
 // Used as demo feedback sample.
-export const DEMO_FEEDBACKS = `globalement nickel mais la gestion des tâches sur le téléphone reste problématique. une fois ouverte je n'y ai plus accès à quand la mise à jour ?!
-Bien trop cher et comporte des bugs
-Compte payé pour le mois de février, mais désactivé hier soir... Et impossible de joindre le service client, sauf si je demande à être appelée pour ouvrir un compte ! Quand je décris l'urgence de la situation, on me dit que la personne responsable "n'a pas de rdv disponible aujourd'hui". Je ne peux pas joindre mes patients, je n'ai plus accès à leurs informations, ni le support doctolib puisqu'il faut un compte ACTIF pour cela !! C'est une vaste blague !
-Ajout de document impossible depuis 6 mois
-Inutilisable sur tablette, je n'ai accès qu'aux consultations du lundi et pas d'accès aux paramètres d'affichage. Je suis obligée de passer par le navigateur web de la tablette avec une très mauvaise ergonomie. Pour le prix de l'abonnement, on pourrait espérer avoir une appli compatible tablette
-inutile, notée 1 étoile depuis plusieurs mois par beaucoup, et pas. de réaction. un lien vers la version web serait plus utile...Dommage car sur tablette, l'accès aux ordo permettrait de ne pas les imprimer. Au travail SVP
-blocage très fréquent de l'application. vraiment contraignant.
-L'agenda ne fonctionne pas sur tablette!!
-bugs entre versio pro et version patient
-je signale un bug : impossible d'attacher un fichier sur un message.
-Un algorithme très mal fait qui ne montre qu'un seul type de rdv, dans les recherches par spécialité. Conséquences les patients ne voient peu de disponibilités et attendent inutilement. Les médecins peuvent voir ne plus avoir de nouveaux patients. Travaillant essentiellement avec des nouveaux patients, je me suis d'un coup retrouvé, depuis 3 semaines avec 0 à 3 nouveau patient/jour Doctolib le sait et ils n'ont pas de solutions pour l'instant et refuse de me faire une remise sur l'abonnement
-On aimerait pouvoir consulter les documents de nos patients pour les échanger avec nos confrères ou les patients au cours des discussions.
-application peu intuitive. depuis la nouvelle mise à jour, impossible d'envoyer un document d'un dossier patient , par mail depuis Doctolib Pro problème remontée depuis près de 6 semaines aux équipes.... Allez l'équipe..... on compte sur vous 😊
-trop de bug récurents dommage Un problème d'envoi de document par l'application a été transmis il y a plusieurs mois , et a été résolu après une longue attente Souci... le problème est réapparu après quelques temps. et après plusieurs semaines , toujours pas corrigé malgré plusieurs appels au service client.
-sous tablelle Android S10+ ne fonctionne pas. l'application est bloquée en mode semaine mais seulement la Journée du Lundi est affichée et repliquée sur tous les autres jours. J'ai desinstallé Puis réinstallé mais ça ne change rien. l'aide proposé n'est pas adaptée car il s'agit tres surement d'un bug de l'application. Notons aussi que vous en informer est difficile car on se retrouve sur une I.A. et c'est tout.
-Vous pouvez l’essayer et voir ce que ça vaut, mais je pense que vous pouvez trouver aussi bien en moins cher. 150€ par mois pour un référencement égal à zéro c’est indécent. Heureusement que les équipes sont réactives quand vous avez un problème !
-1 étoile car si vous payez et que vous n'avez pas de souci tout va bien. ⚠️ Attention toutefois car mon patient a été prélevé alors que la téléconsultation n'a pas pu avoir lieu ! Je n'ai pas reçu l'argent c'est Doctolib qui régale. Très peu de clarté et de d'honnêteté concernant le contact avec le support (sauf 1 personne), par contre le lien avec le gestionnaire est inexistant et le service commercial est 👻 J'envisage la résiliation, c'est plus simple avec Free...
-Très difficile depuis quelques temps de coller les informations, l'appui prolongé sur une case jusqu'à apparition de l'option "coller" ne fonctionne pas, au relâchement de la case l'option disparaît. Depuis peu il est parfois également difficile de sélectionner une case, et donc de remplir les informations... Problème fluctuant. Impossible de gérer comme sur ordinateur le temps attribué à une absence. Si l'on veut fermer un créneau il est automatiquement d'une heure..
-ne fonctionne pas sur tablette !
-depuis dernier mis-à-jour l'application mobile bug, je ne vois pas les commentaires, trop des erreurs
-Un moment quand on fait une application on la teste avant. a quel moment ne pas pouvoir lire en même temps qu'on écrit est normal ? dans la messagerie la partie rédaction est caché systématiquement par le clavier du téléphone donc on écrit a l'aveugle. c'est complètement abberant
-dernièrement il est impossible d’ajouter des notes sans qu'elles soient cachées par le clavier. mes collègues ont le même problème. il est dommage de ne pas avoir autant d’option sur le téléphone que sur l’ordinateur. comme ne pas pouvoir modifier les coordonnées par exemple.
-fonctionnalités inaccessibles sur tablette, je suis obligée d ouvrir une page internet pour utiliser doctolib pro et transmettre des documents à mes patients.
-Ne fonctionne pas du tout sur tablette !
-Application inutilisable pour ma part, la barre présentant les différentes possibilités (paramètre, planning, vues) reste constamment présente et rend donc l’application inutilisable.
-Service quasi inexistant pour résoudre des problèmes post abonnement. Pas de mail de contact, absence de réponse aux peu de moyens de contact restant disponibles...
-Application inutilisable sur tablette. La vue sur un jour reste figée sur le lundi de chaque semaine, je n'ai donc même pas accès au planning des jours suivants quand je clique dessus. Ergonomie informatique à revoir de toute urgence surtout au prix du service
-Je suis très déçue de l'application mobile. Elle est peu intuitive, peu ergonomique et est vraiment incomplète. Par exemple, le motif de consultation est bien affiché, mais les réponses aux questions supplémentaires ne s'affichent pas, même en cliquant sur le rendez-vous. Certains paramètres qui me semblent pourtant essentiels pour une version mobile manquent, notamment l'option de floutage des noms des patients, qui serait très utile pour checker ses RDV mêmes en lieu public.
-Le mode paysage est illisible...😳 Rien ne change avec cette mise à jour... Dans les notifications, il y a le prénom du patient et l'initiale de son nom 🙃... Depuis les dernières mises à jour, quand je clique sur une notification, j'accède au rendez vous du patient mais si j'essaie de fermer la fiche en cliquant sur la croix, rien ne se passe... (toujours pas réglé, 17/4/25). Les tâches visibles sur le site ne le sont pas dans l'application...
-bug souvent, réinstallation nécessaire assez régulièrement, pas forcément synchronisé parfaitement avec l'application PC...
-Nouveauté Doctolib Pro : pour près de 160€/mois on vous offre une application qui synchronise ses données au bout de 3h Donc si vous voulez facturer un dossier créé avec le téléphone, il faudra repasser par l'ordinateur pour recréer le dossier ou demander au patient de revenir dans les 3h Et si vous voulez télétransmettre, penser à compter que les factures faites depuis plus de 3h. Ceci est une révolution
-Expérience vraiment pénible. Un calvaire pour ajouter un rdv. Application lente, pourtant il n'y a pas beaucoup de data à télécharger... Ne prend toujours pas en compte la connexion par empreinte... Pas de widget pour donner une réponse de disponibilité de rdv rapide à un patient. Pas de synchronisation à google agenda ! Du coup besoin de switcher entre deux applications pour vérifier dispo pro et perso (et vu la lenteur...). Impossible de coller numéro de téléphone...
-Bien limité à comparé au capacité de doctolib sur PC c'est dommage
-En 2 ans et demi je n'ai vu aucune amélioration de cette application qui ne me servait qu'à consulter... Mais là suite a une mise a jour je n'ai même plus la possibilité d'aller voir la liste de mes patients de demain.... Bcp d'améliorations pour les médecins et kiné mais pour ceux qui sont là depuis un moment on reste au point mort...
-Effectivement la vue sur 3 jours impossible sur tablette. L'ergonomie est tout simplement catastrophique. Absolument pas intuitif. Au vu du prix de l'abonnement (150 euros/mois) c'est inadmissible !
-Nul nul nul les seuls mise a jour rendent l'application de pire en pire
-Appli facile a utiliser mais deux gros problèmes : on est pas informé de la prise d un nouveau rdv : ni par notification ni par sms ou mail. Il faut donc régulièrement vérifier l agenda sous peine de louper des rdv Pas de synchronisation avec Google agenda. Un gros problème étant donné que j ai plusieurs activités, une vie perso et que sur doctolib je peux uniquement signaler un absence ou un rdv avec un patient je peux pas l utiliser comme agenda.
-Bonne application pour interagir avec les confrères et consœurs. De plus l’application est bien sécurisée.
-Application inutilisable sur les tablettes !!!
-Met du temps pour s'ouvrir. Souvent bloqué sur le logo Doctolibpro. Du coup obligé de sortir pour revenir dessus. Dommage qu'elle soit limité dans les reglages (moins fournit que la version avec un PC)
-Dommage que l on puisse faire si peu de choses. Pas de consultation du dossier pas de rédaction d observation a domicile ...
-L'application plante 1 fois sur 2, beaucoup de lenteur. Aucune amélioration depuis plusieurs années sur la prise de rdv via l'appli alors qu'on fait remonter l'info : impossible d'ouvrir de nouveaux créneaux, il faut aller sur le site internet, impossible de pré-régler une durée de plage horaire, celle-ci est préréglée à 1h. Donc si on a des consultations de 45 minutes, on doit faire le réglage à chaque fois...). L'application est utile pour consulter son agenda mais pas pour le mettre à jour !
-Très lent à ouvrir. Erreur permanente du jour concerné lorsque l'on souhaite rajouter une ouverture, impossible de revenir à l'agenda lorsque l'on suit le lien indiquant un nouveau rendez-vous. Il faut alors refermer l'appli et la réouvrir. Considérant le prix mensuel du service, c'est affligeant et ces erreurs existent depuis au moins un an...
-Des bugs à répétition très pénible
-Le widget tourne en boucle, ne s'ouvre pas, même en l'ayant réinstallé plusieurs fois
-Je l'utilise tous les jours en tant que secrétaire méd. Il était autrefois pratique et nous aider dans nos tâches quotidiennes. Les dialogues avec les médecins étaient simples et rapide Mais depuis la mise à jour des notes où devrais-je dire des tâches, c'est un vrai calvaire ! On perd grandement en efficacités, visuellement et on perd du temps.. Malgré plusieurs retours négatifs rien ne changent... À nous à nous adapter... Oui mais ce n'est pas possible quand ça casse notre rythme de travail
-Plus possible d'accéder à mon agenda à cause de cette mise à jour "vérifiez si vous êtes un humain "
-Conception de la facturation nulle. Ne fonctionne pas hors couverture réseau GSM. Truffée d'erreurs.
-Application buggé sur Samsung impossible d'accéder a quoique ce soit
-Xiaomi Poco M6 pro, l'application ne marche pas et reste bloquée sur le bandeau de droite. après désinstallation etc, toujours le même problème. il faut faire quelque chose c'est invivable.
-Application à fuir sur smartphone
-2019 : Depuis 6 mois J'ai été obligée de désinstaller et reinstaller l'appli une bonne dizaine de fois pour bug prolongés...encore de gros efforts à faire... 23/02/24 Rien n'a changé !!!! Suis toujours obligée de desinstaller régulièrement l'application....à 149€/mois, j'attends à plus de fiabilité !
-C'est dommage, l application beug énormément... la plus part du temps ça se fige sur un rdv patient et plus possible de revenir au planning.
-Service client nul, offre de parrainage inexistante même lors d un parrainage, et doctolib se permet de faire des contres offre ce que je trouve anormale ...
-Aucune possibilité d'accéder à la messagerie patient sur android, "la nouvelle fonctionnalité doctolib pro qu'on attendait enfin" ... Juste incroyable de voir que l'appli ne permet que d'accéder à doctolib team de sorte que j'ai des patients qui me contactent sans que je ne puisse voir leur message quand je suis en déplacement... C'est grotesque !
-N'arrive plus à se connecter, malgré 4G suffisante depuis le lifting. Super le lifting au passage, virer le jaune qui se repérait en un clin d'œil pour un bleu quasi identique à la version patient c'est du génie
-Elle fonctionne parfaitement....maintenant il faudrait pouvoir ouvrir le dossier patient via l'application !
-Je viens de passer sur la version associé au ligiciel de gestion. Que des bugs, des freeze. Et tous les jours des bugs différents. Parfois les mêmes (la photographie de la prescription fait systématiquement quitter l'appli). Je perds un temps fou sur mes prises en charges alors que l'argument de vente de la marque est justement le gain de temps.
-A chaque mise à jour un nouveau problème apparaît... Déjà que lorsqu'elle fonctionne elle n'est pas ergonomique.... Vu le fric qu'on vous lâche, ce serait pas mal d'investir sur le développement de votre application mobile !
-Application très pratique et de nouveau fonctionnelle depuis le traitement du bug !
-Impossible d'ajouter des documents. L'appli bug
-Jamais reussi a ouvrir lappli un bug depuis plus dun an cest ABUSER !!!
-Plutôt bon outil, malgré quelques bugs qui peuvent persister quelques semaines avant d'être fixés, Mais doctolib vante "pas de frais cachés" et augmente de 10€/an, ne mettez pas les pieds dedans, d'autres plateformes sont beaucoup moins gourmandes et aussi efficaces
-Depuis la mise à jour impossible d'utiliser l'application !
-Appli trop lente, qui s'ouvre difficilement malgré une bonne connexion . Il faudrait aussi des améliorations : un fichier contact complet, et une meilleure visibilité des rdv annulés, au niveau graphique cela ne ressort pas (il faudrait que ce soit beaucoup plus clair par ex).
-Nombreuses erreurs lenteur en 4g
-L'info de base, c'est qu'avec 92% de part de marché, Doctolib se permet ouvertement de mépriser ses clients. À 149€ / mois, c'est le service le plus cher du marché pour la qualité la plus basse (pauvreté des fonctionnalités, aucun service client, aucune personnalisation possible), et les tarifs augmentent de 10% / an depuis 5 ans ! J'ai dû en changer pour comprendre l'ampleur de la fumisterie. Bref : regardez simplement ce qui se fait ailleurs, vous allez comprendre par vous-même.
-L'application bug de plus en plus. L'ouverture de L'application est extrêmement lente et les temps de chargement sont interminables. Obligé de relancer l'application plusieurs fois pour qu'elle fonctionne correctement. Parfois les rendez-vous ou absences créés ne peuvent être enregistrés car l'application bug. De plus je suis situé à la Réunion et les délais de prise de rendez-vous ne sont pas respecté certainement du au décalage horaire entre la Réunion et la France Métropolitaine.
-J'utilise l'application piyr savoir qui est dans la salle d'attente. Mais l'appli ne se met pas à jour immédiatement lorsque les secrétaires cliquent sur '' en salle'' pour un patient, de plus l' affichage passe de paysage à portrait, passant d'un affichage au jour qui est désiré, à un affichage à la semaine, puis revient à un affichage au jour, mais au lundi. On est donc constamment en train de changer le jour de l'agenda. A améliorer
-149 euros / mois. Les connexions rament pour cette appli mobile . Pas bcp d'options de paramétrage par rapport à l'appli pc. On dirait qu'elle est complément laissée de côté . C pas terrible.
-Augmentation du tarif de 10€ tous les ans, +50% en 5 ans. D'un autre côté avec ce monopole, quand on a trouvé le bon filon, c'est con de creuser à côté 🤣 Bien vu Sinon, l'appli bug toujours sur les zoom/dézoom, l'ouverture de créneaux exceptionnels n'est pas pratique mais ça reste pratique.
-Crash au bout de 10 secondes depuis la dernière màj
-Application qui "bug" tout le temps. Dommage, ça rend l'utilisation au quotidien très désagréable
-A quand (enfin) le widget avec l'agenda ??
-Je comprends vraiment pas comment on peut avoir une appli professionnelle avec des bugs. Vous devriez sincèrement (et rapidement) trouver des solutions à ces dysfonctionnements. Quand j'ai une notif de nouveau rdv qui m'amène à la page des infos du patient et du rdv, impossible de revenir à l'agenda !
-Application avec beaucoup de bug, non intuitive, et avec très très peu de fonctionnalités, pour le prix de 140 euros de doctolib pro au mois ( ce qui en fait la plate-forme la plus chère de rendez vous en ligne) ceci est clairement une honte.. S'il vous plaît payez vous un informaticien avec tous cet argent que vous vous faites
-Ce jour toujours le même problème. Ça allait mieux à nouveau et depuis la maj application qui ne s'ouvre pas et laisse un écran de chargement extrêmement long même en telechargeant à nouveau l'application.
-Peut mieux faire. Pratique d'avoir toujours son agenda dans la poche mais bien moins complète et pratique que la version PC. La messagerie notamment est une galère.
-Ça ne marche plus depuis des mois sur le téléphone !
-Mes rdv ne se chargent plus. Il me les affiche 1 sec puis mouline dans le vide. Téléphone mis à jour, appli désinstallée/ réinstallée, ... ça rame depuis quelques semaines déjà mais là c'est bien pire!!!
-Bugs réguliers à l'ouverture effacement du cache régulier, bref fonctionne mal, avec de gros lags.
-Trop de bug, depuis longtemps, sans solutions apportées
-Nous sommes le 8 janvier 23, depuis cet été le bug de l'écran blanc n'a toujours pas été réglé. Et maintenant on a le plaisir d'avoir notre agenda qui disparaît des qu'on lance l'appli pour que celui ci charge indéfiniment. En gros l'appli ne sert strictement à rien. Là c'est de l'abus.
-Agenda invisible pour la semaine en cours et est seulement visible pour la semaine prochaine. Application inutilisable.
-Ce soir impossible de consulter mon agenda, cela mouline et il reste vide. J'ai essayé depuis mes deux téléphones, idem. Je ne peux donc rien consulter ce qui est plus qu'handicapant. Un changement est impératif!
-Nouvelle mise à jour, nouveaux bugs non fixés, nouvel avis toujours aussi mauvais
-Application remplie de bugs en tout genre...
-Désinstallation réinstallation et toujours le même problème tout mon agenda est décalé....impossible de se connecter à l'application depuis plus de deux jours pour moi c'est fini doctolib
-Appli non fonctionnelle depuis 48h côté professionnel.... Manque des conditions de prise de rv... Patientes peuvent se positionner sur n'importe quelle plage horaire quelles aient ou non déjà un dossier créé malgré la proposition alternative, l'absence de consultation antérieure devrait être bloquante.....
-On n'y utilise pas toutes les fonctionnalités de Doctolib.
-Aller, je pose ici la solution à un problème courant que j'ai moi même rencontré... Si votre agenda est décalé, mettez à jour l'application Android System Webview. En effet doctolib l'utilise pour afficher son site. Si votre version est trop vieille, vous aurez des bugs.
-Ça bloque toujours sur la dernière pacient qui a pris le rdv et suite c'est impossible de revenir a la page d' accueil .J' ai était obligé de desinstaler et suite reinstaler l' appli.
-Plante a certain moment, se bloque sur certaines pages, ne réagit plus soudainement...bref doctolib ne semble pas développer aussi bien que sur Ios ..et tjr pas d'appli avec l'interface adapté à l'iPad ...
-Il serait utile d'avoir les mêmes fonctionnalités que sur l'application bureau (gestion des motifs, etc.)
-Très peu de fonctionnalités par rapport à la version sur ordinateur...dommage de ne pas pouvoir régler les paramètres depuis son smartphone
-Appli pratique et fonctionnelle Pas logique que les professions non Adeli payent le même tarif que les professions Adeli avec des services en moins ( Doctolib team )
-Problème lorsque l'on regarde une notification, écran bloqué, impossible de revenir vers l'agenda
-Impossible de prendre un RDV via l'application sur un smartphone ... ça met qu'il n'y a pas de RDV 🤦🏻‍♀️
-Application illisible sur tablette ! Impossible de passer en plein écran, de passer en mode "vue semaine", et d'accéder à l'ensemble des rdv par jour. Appli inutilisable !
-Depuis la dernière mise à jour, plus aucune notification. C'est super contraignant, on est pas prévenu des nouvelles prises de rendez-vous. Donc possibilité de passer à côté d'un rajout de dernière minute`;
+export const DEMO_FEEDBACKS = `not bad but so flipping annoyingwhen the voice just stops and says "Sorry, Something Went Wrong" NOTHING IS WRONG BRO MY WIFI IS FULL ITS THE APP, please fix the voices bro, thanks. no rudeness or offense intended
+It won't give me a new roblox code
+The image generation limit is unnecessary.
+Helps in many different areas. From cooking tips to mechanical information
+this project is very good
+fast and consistent I love it
+It makes great images but everything I type in violates the services everything is consoderd sex.......lol... what dose drink a cup of tea have to do with sex 🤔 anyhow deleted it. also when it tells you it can't make a picture that counts as one of your daily credits now that's cheeky.... "the image are used in is considered sexualised and goses against our policy" but the image that's going against your policy is one you created for me yourself. copyright and stupidity has ruined this.
+Hey " OpenAI " Developers , Kindly Make Something Convenient :(
+very happy with the app
+after the latest update...the app is shutting down automatically mid way. While entering the prompt it gets stuck. An hour with this tool I've already shut it and reopened 10 times.. Also the new update has a lot....a lot of restrictions...it stops almost everything.. especially while trying to write a story...it ruins the essence....
+To argumentative now cause of it not being able to be one side or the other anything you say it brings up a counter point turning every conversation into a debate disagreement or a argument
+খুব ভাল বন্ধু কারন তুমি আমার মনের ভাষা বোঝ
+Very good and reliable
+They'll give any possible solution of ur problem, just amazing
+very good app thanks for open ai
+Khub sundor ak ta app amar moner moto hoyse
+very annoying. often spreads misinformation and when you try to correct it, gets defensive and starts gaslighting you instead of admitting it was wrong. makes weird assumptions without knowing the full story. probably does more harm than good because the answers can be complete bs and this thing doesn't know how to say "i don't know enough about this topic to give an answer". has also said some pretty offensive things. just use google jfc.
+it's very important to me
+this thing can't talk
+most incredible app, smart and convinience
+বা*ল পাকনা অ্যাপ, এক লাইন সব সময় বেশি বুজে🤢
+just the best one tbh like a virtual brother
+I give 5 star to this app
+chat helps you with everything you want to do I like more for helping with my homeworks
+very useful tfor business
+good 😊😊😊😊😊😊😊😊😊😊😊😊😊😊😊😊😊😊😊😊
+.a help in every situation
+So far it has been a great experience using chatgtp
+ዝብድብኅድብእስይስይብዥይብይብይይብብንብዥይብንብይብይብይይብይብድንብድብ
+overall good but if you don't pay then it's not good in advance
+Download the question papers
+Chat GPT is the best, imagine all Ai ads can't do ads without mentioning Chat GPT
+I am feeling good, happy
+my 3 ji ko ji ko ji vi vi ji s ji koy77 6 loji se 68jhjoo ki
+I have no reason, but its just helpful!!
+Great app, love it many functions and would recommend it to others
+I really love it and it's so helpful 😁.
+chart gpt is helpful
+Awesome work 👍🏻 congratulations
+chat gpt it good it has help me thank you very much
+at firat this app is great but as these reviews state, eficiency really breaks down in time and all the obnoxious attempts to get us to upgrade when so many other stronger free ai tools are available now, make this app more a waste of time than anything.. There are others that work much more eficintly, no upgrades necesary and free..
+so I paid about $20 for the plus subscription, and going back into the app I STILL don't have plus benefits. I'm kinda pissed. either I get what I paid for, or you all are thieves and liars
+its inconsistent if you want images, and if theres an error on their side of things. it counts against your limit. "What’s happening is the image tool attempt itself can count toward the daily limit, even if it fails (either from rate limits or content filters). So from your side it feels like “I didn’t get anything, why did it use a slot?”—but the system still logged it as a generation request. It’s not ideal, honestly. You basically got double-hit -rate limit timing -the policy flag" end quote
+this app helped me a lot in studies ,reaching, and even critical thinking
+bohot acha dost hai ye app
+So good for work because it help me in everything without math some questions are wrong ☺but still I really love it
+let it be free while using the app mostly camera
+Feel free to ask anything instant good and impressive reply most of the best thing is it's free teach like a teacher
+very good 👍 I'm very happy with you so a amazing app
+it's safe giving correct answers and good for students
+it's very good experience
+I think this app is amazing
+the app help me in my school homework I love this app very much 😍😍
+literary all ab subscriptions
+I am giving this only 2 stars becuase of the problem or bugs, that i am very sure are specific to me. I have been using their codex for like 2 weeks now and recently I noticed that as soon as start the models like get 5.3-codex or a non mini models, my whole quota just gets exhausted in within few seconds. I am writing this here just out of pure frustration because there is no contact us or report bug option in their system....pls help me!
+wonderful experience...
+Brilliant! fast, easy, and concise. a great planning tool.
+App is awesome, but I only gave it one start because pulse crashes when I open it from the app. Still happening on the latest version on the app.
+This app is fabulous i am glad to install this app
+the limit is not fair
+Words themself dont explain how gratefully is this app to me .....I just want to say special thanks to the creator...
+very lovely to create anything u want in your present and working aspect
+best of luck qalandar ❣️🫀🫀❣️😍
+such a smart ai companion always helpojg and fast ai to load up in many problems
+it is very good but not realistic.
+nice easy communication
+it's not a must for you to upgrade to plus or go not everyone has money
+Everything is good but it is really bad at following instructions. Please make it so that the AI stops gaslighting the user.
+awful. never gets the commands right and ignores most commands. something small and stupid will violate terms.. it's dumb don't waiste your time or money
+not efficient for coding purposes
+chatGPT bahut bahut bahut bahut bahut achcha hai 10/100000000000000000000⁰⁰0∅
+camera feature not working even after purchasing go
+Best....jo kaho voh easily message, calculation, invitation,email aur bahut kuch ek command me bana deta hai... itne din kahan the yaar ChatGPT
+पृष्ठ, वव्््व््््षव्््, ठ्षठठषषा
+This app is I found it very helpful in daily tasks.please feel free to try 👍👍💯💯
+nice and informative
+verey nice look verey good
+i love it ,it answers everything that i ask for 🥰
+it answers the questions correctly
+achcha app hai bahut Sundar
+I like it so far. ive asked it so dirty questions and it answered them, unlike Microsoft Pilot. it literally told me it didnt like that topic (sexual health related question) and gave me a few topics we could look up stuff on- neither had anything to do with my question though. so I got rid of Pilot and use ChatGPT, Grok, and Perplexity.
+always give wrong information
+am so happy it helped me a lot
+chatGPTis sovry very nise
+I really appreciate you
+iam very happy have it
+you can say it a Best friend
+very very very very very good app
+f didi l backtrack happen brag can half capital j faun bath jaw
+very great full & helpfull chatgpt
+smart, even tho there is some bugs to fix. it deserves a 3.5
+this was very good app of chat gpt
+Nice app for everything. I recommend that it's app her mobile phone me rahna chahiye.
+answers were fantastic
+it doesn't do what you tell it to do im very angry
+00i ki hy hy tt thu hi tqhy hu r ko ji hu hu ya y hu ya no tt TT we see dr dr 7 gulf we
+This is the best app for studying❤️👌
+uu are great keep it up
+I really like the app it's my best AI in my phone ❤️‍🔥
+salary expectations LAP mean what❓`;

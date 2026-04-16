@@ -388,7 +388,17 @@ export default function UserStoryCards({ cards }: { cards: UserStoryCard[] }) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-sm font-semibold text-gray-900">Sprint cards · sorted by RICE score</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-gray-900">Sprint cards · sorted by RICE score</h2>
+        <a
+          href="https://triage-mvp.atlassian.net/jira/software/projects/SCRUM/boards"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
+        >
+          View Jira board ↗
+        </a>
+      </div>
       <div className="space-y-4">
         {sorted.map((card, i) => {
           const meta = TYPE_META[card.action_type] ?? TYPE_META.other;

@@ -133,6 +133,7 @@ IMPORTANT RULES FOR CORRECTIONS:
         """
         import asyncio as _asyncio
 
+        groq_error: Exception | None = None
         if self.groq_client:
             n = n_feedbacks or 25
             max_tokens = min(
@@ -147,8 +148,8 @@ IMPORTANT RULES FOR CORRECTIONS:
                     max_tokens=max_tokens,
                 )
                 return response.choices[0].message.content
-            except Exception:
-                pass  # fall through to Gemini
+            except Exception as e:
+                groq_error = e  # fall through to Gemini
 
         # Gemini fallback — with retries on transient 503/UNAVAILABLE
         last_error: Exception | None = None
@@ -165,6 +166,16 @@ IMPORTANT RULES FOR CORRECTIONS:
                 if is_retryable and attempt < 2:
                     await _asyncio.sleep(2 ** attempt)  # 1s, 2s
                     continue
+                # Both Groq and Gemini failed — build a friendly combined message
+                is_quota = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower()
+                if is_quota and self.groq_client:
+                    raise RuntimeError(
+                        "Daily quota exhausted on both Groq and Gemini free tiers — "
+                        "retry in a few minutes (Groq rate limit resets quickly) "
+                        "or tomorrow (Gemini daily quota resets at midnight Pacific). "
+                        f"Groq error: {type(groq_error).__name__ if groq_error else 'n/a'} — "
+                        f"Gemini error: {error_str[:200]}"
+                    ) from e
                 raise
         raise last_error  # type: ignore[misc]
 
@@ -294,7 +305,7 @@ IMPORTANT RULES FOR CORRECTIONS:
     # Step 2: Executive report
     # ------------------------------------------------------------------
 
-    async def generate_report(self, items: list[dict]) -> tuple[str, bool]:
+    async def generate_report(self, items: list[dict], app_name: str | None = None) -> tuple[str, bool]:
         """
         Generates a PM executive report from the categorized feedbacks.
         Returns (report_text, used_fallback).
@@ -318,7 +329,12 @@ IMPORTANT RULES FOR CORRECTIONS:
             issue_clusters.append({"category": cat, "total": len(group), "top_issues": top_issues})
         issue_clusters.sort(key=lambda x: x["total"], reverse=True)
 
-        prompt = f"""You are a senior Product Manager. Generate an executive report based on this analysis of {len(items)} user feedbacks.
+        app_context = f' for the app "{app_name}"' if app_name else ""
+        app_rule = (
+            f'- The product under review is "{app_name}". Mention it by name in the Summary section (at least once).\n'
+            if app_name else ""
+        )
+        prompt = f"""You are a senior Product Manager. Generate an executive report based on this analysis of {len(items)} user feedbacks{app_context}.
 
 OVERVIEW:
 - Sentiment: {json.dumps(sentiment_stats, ensure_ascii=False)}
@@ -334,7 +350,7 @@ Return ONLY valid JSON (no markdown, no surrounding text) with this exact struct
 }}
 
 Rules for report content:
-- Action titles: name the specific feature/flow (e.g. "Fix appointment date picker crash on iOS" not "fix bugs")
+{app_rule}- Action titles: name the specific feature/flow (e.g. "Fix appointment date picker crash on iOS" not "fix bugs")
 - If multiple distinct issues share a category, pick the most impactful — mention others in justification
 - Include counts/percentages to justify prioritization
 - Actions must be specific enough to copy directly as a sprint backlog ticket title
