@@ -72,7 +72,7 @@ export default function Home() {
             <div className="flex items-stretch gap-2">
               {[
                 { emoji: "🕸️", name: "Webb", role: "Web Scraper", desc: "Pulls reviews from App Store & Google Play" },
-                { emoji: "🔬", name: "Iris", role: "Categorizer", desc: "Tags, scores & prioritizes every feedback" },
+                { emoji: "🔬", name: "Iris", role: "Categorizer", desc: "Tags & prioritizes every feedback" },
                 { emoji: "🖊️", name: "Hugo", role: "Reporter", desc: "Writes the executive summary" },
                 { emoji: "✨", name: "Stella", role: "Backlog Builder", desc: "Generates sprint cards with RICE scoring" },
               ].map((a, i, arr) => (
