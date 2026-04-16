@@ -202,6 +202,8 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
   useEffect(() => {
     if (!appIsOther) return;
     if (!searchQuery.trim()) { setSearchResults([]); return; }
+    // Skip search if query already matches selected app (just picked from list)
+    if (selectedApp && selectedApp.name === searchQuery) return;
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => {
       setIsSearching(true);
