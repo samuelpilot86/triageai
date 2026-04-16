@@ -228,46 +228,82 @@ async def search_appstore_apps(query: str, count: int = 8) -> list[dict]:
 # Review fetchers
 # ------------------------------------------------------------------
 
+# Locales tried in order when the primary locale returns too few reviews.
+# Google Play: (lang, country). App Store: just country codes.
+PLAY_LOCALES = [("en", "us"), ("fr", "fr"), ("en", "gb"), ("es", "es"), ("de", "de")]
+APPSTORE_COUNTRIES = ["us", "fr", "gb", "es", "de"]
+
+
 async def fetch_play_store_reviews(play_id: str, count: int = 50) -> list[str]:
-    """Fetches the most recent reviews from the Google Play Store."""
+    """Fetches the most recent reviews from Google Play, with multilingual fallback.
+
+    Tries locales in PLAY_LOCALES order; accumulates reviews until `count` is reached
+    or locales are exhausted. De-duplicates identical review bodies across locales.
+    """
     if not GOOGLE_PLAY_AVAILABLE:
         raise ImportError("google-play-scraper is not installed.")
 
     loop = asyncio.get_event_loop()
-    result, _ = await loop.run_in_executor(
-        None,
-        lambda: gp_reviews(
-            play_id,
-            lang="en",
-            count=count,
-            sort=Sort.NEWEST,
-        ),
-    )
-    return [r["content"] for r in result if r.get("content")]
+    collected: list[str] = []
+    seen: set[str] = set()
+
+    for lang, country in PLAY_LOCALES:
+        if len(collected) >= count:
+            break
+        remaining = count - len(collected)
+        try:
+            result, _ = await loop.run_in_executor(
+                None,
+                lambda l=lang, c=country, n=remaining: gp_reviews(
+                    play_id, lang=l, country=c, count=n, sort=Sort.NEWEST,
+                ),
+            )
+        except Exception:
+            continue
+        for r in result:
+            body = (r.get("content") or "").strip()
+            if body and body not in seen:
+                seen.add(body)
+                collected.append(body)
+                if len(collected) >= count:
+                    break
+
+    return collected
 
 
 async def fetch_app_store_reviews(ios_id: str, count: int = 50) -> list[str]:
-    """Fetches reviews from the App Store via Apple's public RSS feed."""
-    url = (
-        f"https://itunes.apple.com/rss/customerreviews/"
-        f"id={ios_id}/sortBy=mostRecent/json"
-    )
+    """Fetches reviews from the App Store RSS feed, with country fallback."""
     loop = asyncio.get_event_loop()
-    response = await loop.run_in_executor(
-        None,
-        lambda: requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"}),
-    )
-    response.raise_for_status()
-    data = response.json()
+    collected: list[str] = []
+    seen: set[str] = set()
 
-    entries = data.get("feed", {}).get("entry", [])
-    if entries and "im:rating" not in str(entries[0]):
-        entries = entries[1:]
+    for country in APPSTORE_COUNTRIES:
+        if len(collected) >= count:
+            break
+        url = (
+            f"https://itunes.apple.com/{country}/rss/customerreviews/"
+            f"id={ios_id}/sortBy=mostRecent/json"
+        )
+        try:
+            response = await loop.run_in_executor(
+                None,
+                lambda u=url: requests.get(u, timeout=15, headers={"User-Agent": "Mozilla/5.0"}),
+            )
+            response.raise_for_status()
+            data = response.json()
+        except Exception:
+            continue
 
-    reviews = []
-    for entry in entries[:count]:
-        content = entry.get("content", {}).get("label", "")
-        if content and len(content) > 10:
-            reviews.append(content)
+        entries = data.get("feed", {}).get("entry", [])
+        if entries and "im:rating" not in str(entries[0]):
+            entries = entries[1:]
 
-    return reviews
+        for entry in entries:
+            if len(collected) >= count:
+                break
+            content = (entry.get("content", {}).get("label") or "").strip()
+            if len(content) > 10 and content not in seen:
+                seen.add(content)
+                collected.append(content)
+
+    return collected
