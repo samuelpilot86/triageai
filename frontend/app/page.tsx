@@ -64,6 +64,28 @@ export default function Home() {
                 Your AI agents will categorize, prioritize, and turn them into sprint-ready cards.
               </p>
             </div>
+
+            {/* How it works */}
+            <div className="grid grid-cols-4 gap-0 max-w-2xl">
+              {[
+                { n: 1, title: "Scrape", desc: "Pull reviews from App Store or Google Play" },
+                { n: 2, title: "Categorize", desc: "AI agents tag, score & prioritize" },
+                { n: 3, title: "Report", desc: "Executive summary for stakeholders" },
+                { n: 4, title: "Push to Jira", desc: "RICE-scored sprint cards, one click" },
+              ].map((s, i, arr) => (
+                <div key={s.n} className="relative text-center px-2">
+                  {i < arr.length - 1 && (
+                    <span className="absolute right-0 top-3 text-gray-300 text-sm">→</span>
+                  )}
+                  <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-xs font-bold text-indigo-500 mx-auto mb-2">
+                    {s.n}
+                  </div>
+                  <div className="text-xs font-semibold text-gray-800 mb-0.5">{s.title}</div>
+                  <div className="text-[11px] text-gray-400 leading-snug">{s.desc}</div>
+                </div>
+              ))}
+            </div>
+
             <div className="bg-white rounded-2xl border border-gray-200 p-6">
               <InputPanel
                 onAnalyzeText={analyzeText}
