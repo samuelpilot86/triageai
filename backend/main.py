@@ -105,7 +105,7 @@ def sse_event(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-async def analysis_stream(feedbacks: list[str]) -> AsyncGenerator[str, None]:
+async def analysis_stream(feedbacks: list[str], app_name: str | None = None) -> AsyncGenerator[str, None]:
     agent = get_agent()
 
     yield sse_event("status", {"step": "categorization", "message": f"Analyzing {len(feedbacks)} feedbacks…"})
@@ -125,7 +125,7 @@ async def analysis_stream(feedbacks: list[str]) -> AsyncGenerator[str, None]:
     yield sse_event("status", {"step": "report", "message": "Generating executive report…"})
 
     try:
-        report, actions, report_fallback = await agent.generate_report(items)
+        report, actions, report_fallback = await agent.generate_report(items, app_name=app_name)
     except Exception as e:
         yield sse_event("error", {"message": str(e)})
         return
@@ -247,7 +247,7 @@ async def analyze_store(body: dict):
 
         yield sse_event("scraped", {"count": len(feedbacks), "source": source})
 
-        async for chunk in analysis_stream(feedbacks[:200]):
+        async for chunk in analysis_stream(feedbacks[:200], app_name=app_entry.get("name")):
             yield chunk
 
     return StreamingResponse(stream(), media_type="text/event-stream", headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})

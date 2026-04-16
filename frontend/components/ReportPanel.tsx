@@ -104,25 +104,28 @@ export function IrisCorrections({ result }: { result: AnalysisResult }) {
   const corrections = rawCorrections.filter((c) => c.old_value !== c.new_value);
 
   return (
-    <div className="space-y-1.5">
-      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-        Iris self-corrections {corrections.length > 0 ? `(${corrections.length})` : ""}
-      </h3>
-      {corrections.length === 0 ? (
-        <p className="text-xs text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg">
-          ✓ All {items.length} feedbacks reviewed across category, priority and sentiment — no corrections needed.
-        </p>
-      ) : (
-        corrections.map((c, i) => (
-          <div key={i} className="text-xs text-gray-600 bg-gray-50 px-3 py-2 rounded-lg">
-            <span className="font-medium">#{c.id}</span> — {c.field}:{" "}
-            <span className="line-through text-gray-400">{String(c.old_value)}</span>{" "}
-            → <span className="font-medium text-indigo-600">{String(c.new_value)}</span>{" "}
-            <span className="text-gray-400">({c.reason})</span>
-          </div>
-        ))
-      )}
-    </div>
+    <details className="space-y-1.5 group">
+      <summary className="cursor-pointer list-none text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-700 select-none">
+        <span className="inline-block transition-transform group-open:rotate-90 mr-1">▸</span>
+        Iris self-corrections {corrections.length > 0 ? `(${corrections.length})` : `(0 — all ${items.length} feedbacks OK)`}
+      </summary>
+      <div className="space-y-1.5 mt-2">
+        {corrections.length === 0 ? (
+          <p className="text-xs text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg">
+            ✓ All {items.length} feedbacks reviewed across category, priority and sentiment — no corrections needed.
+          </p>
+        ) : (
+          corrections.map((c, i) => (
+            <div key={i} className="text-xs text-gray-600 bg-gray-50 px-3 py-2 rounded-lg">
+              <span className="font-medium">#{c.id}</span> — {c.field}:{" "}
+              <span className="line-through text-gray-400">{String(c.old_value)}</span>{" "}
+              → <span className="font-medium text-indigo-600">{String(c.new_value)}</span>{" "}
+              <span className="text-gray-400">({c.reason})</span>
+            </div>
+          ))
+        )}
+      </div>
+    </details>
   );
 }
 
