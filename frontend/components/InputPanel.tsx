@@ -11,7 +11,7 @@ type Tab = "text" | "csv" | "store" | "demo";
 interface Props {
   onAnalyzeText: (feedbacks: string[]) => void;
   onAnalyzeCsv: (file: File) => void;
-  onAnalyzeStore: (app: AppEntry, store: Store) => void;
+  onAnalyzeStore: (app: AppEntry, store: Store, count: number) => void;
   disabled?: boolean;
 }
 
@@ -141,7 +141,10 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
   const [dragOver, setDragOver] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [store, setStore] = useState<Store>("googleplay");
+  const [reviewCount, setReviewCount] = useState<number>(100);
   const [categories, setCategories] = useState<string[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [categoriesError, setCategoriesError] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [apps, setApps] = useState<AppEntry[]>([]);
   const [selectedApp, setSelectedApp] = useState<AppEntry | null>(null);
@@ -152,7 +155,26 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Reset count when switching store
+  useEffect(() => {
+    setReviewCount(store === "appstore" ? 50 : 100);
+  }, [store]);
+
   // Fetch categories when store changes
+  const loadCategories = useCallback(() => {
+    setCategoriesLoading(true);
+    setCategoriesError(false);
+    fetch(`${API_BASE}/api/store/categories?store=${store}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const cats = d.categories ?? [];
+        setCategories(cats);
+        if (cats.length === 0) setCategoriesError(true);
+      })
+      .catch(() => setCategoriesError(true))
+      .finally(() => setCategoriesLoading(false));
+  }, [store]);
+
   useEffect(() => {
     setSelectedCategory("");
     setSelectedApp(null);
@@ -160,11 +182,8 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
     setAppIsOther(false);
     setSearchQuery("");
     setSearchResults([]);
-    fetch(`${API_BASE}/api/store/categories?store=${store}`)
-      .then((r) => r.json())
-      .then((d) => setCategories(d.categories ?? []))
-      .catch(() => {});
-  }, [store]);
+    loadCategories();
+  }, [store, loadCategories]);
 
   // Fetch top apps when category changes
   useEffect(() => {
@@ -326,17 +345,33 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
           {/* Category dropdown */}
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
-            <div className="relative">
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full appearance-none px-3 py-2 pr-8 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">Select a category…</option>
-                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <ChevronDown className="absolute right-2 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" />
-            </div>
+            {categoriesError ? (
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-xs text-red-600">
+                <span>Failed to load categories — backend may be starting up</span>
+                <button
+                  onClick={loadCategories}
+                  className="ml-2 font-semibold underline hover:no-underline shrink-0"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  disabled={categoriesLoading}
+                  className="w-full appearance-none px-3 py-2 pr-8 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:text-gray-400"
+                >
+                  <option value="">{categoriesLoading ? "Loading categories…" : "Select a category…"}</option>
+                  {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+                {categoriesLoading
+                  ? <Loader2 className="absolute right-2 top-2.5 w-4 h-4 text-gray-400 animate-spin pointer-events-none" />
+                  : <ChevronDown className="absolute right-2 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" />
+                }
+              </div>
+            )}
           </div>
 
           {/* App dropdown — top 10 + Other */}
@@ -404,9 +439,32 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
             </div>
           )}
 
+          {/* Review count */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Reviews to fetch</label>
+            {store === "appstore" ? (
+              <p className="text-sm text-gray-400 px-3 py-2 rounded-lg border border-gray-100 bg-gray-50">
+                50 <span className="text-xs">(Apple RSS feed hard limit)</span>
+              </p>
+            ) : (
+              <div className="relative">
+                <select
+                  value={reviewCount}
+                  onChange={(e) => setReviewCount(Number(e.target.value))}
+                  className="w-full appearance-none px-3 py-2 pr-8 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {[50, 100, 150, 200].map((n) => (
+                    <option key={n} value={n}>{n} reviews</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" />
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-end">
             <button
-              onClick={() => selectedApp && onAnalyzeStore(selectedApp, store)}
+              onClick={() => selectedApp && onAnalyzeStore(selectedApp, store, reviewCount)}
               disabled={!canSubmitStore}
               className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-indigo-700 transition-colors shadow-sm"
             >

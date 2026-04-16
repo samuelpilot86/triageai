@@ -229,18 +229,18 @@ export function useAnalysis() {
     });
   }, [handleEvents, startCategorization]);
 
-  const analyzeStore = useCallback((app: AppEntry, store: Store) => {
+  const analyzeStore = useCallback((app: AppEntry, store: Store, count: number = 100) => {
     // Store: scraping phase first, categorization estimate set when scraped arrives
     setStep({ type: "scraping" });
     setPartialItems([]);
     categorizationStartRef.current = null;
-    nFeedbacksRef.current = 100; // store always fetches up to 100
+    nFeedbacksRef.current = count;
     return streamEvents(
       `${API_BASE}/api/analyze/store`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ app, store }),
+        body: JSON.stringify({ app, store, count }),
       },
       async (event, data) => {
         // When scraping done, switch to categorization with estimate
