@@ -199,6 +199,15 @@ async def analyze_store(body: dict):
     if not app_entry:
         raise HTTPException(status_code=422, detail="app is required.")
 
+    # Validate the app entry shape — a missing id would cause a silent zero-result scrape
+    logger.info("analyze_store.received body=%s", json.dumps(body)[:500])
+    app_id = app_entry.get("id")
+    if app_id is None or str(app_id).strip() == "":
+        raise HTTPException(
+            status_code=422,
+            detail=f"app.id is missing or empty. Received app_entry={app_entry}",
+        )
+
     feedbacks: list[str] = []
 
     async def stream():
