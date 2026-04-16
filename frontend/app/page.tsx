@@ -71,16 +71,17 @@ export default function Home() {
             {/* Agent pipeline preview */}
             <div className="flex items-stretch gap-2">
               {[
-                { emoji: "🕸️", name: "Webb", role: "Web Scraper", desc: "Pulls reviews from App Store & Google Play" },
-                { emoji: "🔬", name: "Iris", role: "Categorizer", desc: "Tags & prioritizes every feedback" },
-                { emoji: "🖊️", name: "Hugo", role: "Reporter", desc: "Writes the executive summary" },
-                { emoji: "✨", name: "Stella", role: "Backlog Builder", desc: "Generates sprint cards with RICE scoring" },
+                { emoji: "🕸️", name: "Webb", role: "Web Scraper", model: "Python scraper", desc: "Pulls reviews from App Store & Google Play" },
+                { emoji: "🔬", name: "Iris", role: "Categorizer", model: "Groq · Llama 3.3 70B", desc: "Tags & prioritizes every feedback" },
+                { emoji: "🖊️", name: "Hugo", role: "Reporter", model: "Gemini 2.5 Flash", desc: "Writes the executive summary" },
+                { emoji: "✨", name: "Stella", role: "Backlog Builder", model: "Gemini 2.5 Flash", desc: "Generates sprint cards with RICE scoring" },
               ].map((a, i, arr) => (
                 <div key={a.name} className="flex items-center flex-1 min-w-0 gap-2">
                   <div className="flex-1 min-w-0 rounded-xl border border-gray-200 bg-white p-3 text-center">
                     <div className="text-xl mb-1">{a.emoji}</div>
                     <div className="text-xs font-semibold text-gray-800">{a.name}</div>
-                    <div className="text-[10px] text-indigo-500 font-medium mb-1">{a.role}</div>
+                    <div className="text-[10px] text-indigo-500 font-medium mb-0.5">{a.role}</div>
+                    <div className="text-[10px] font-mono text-gray-400 mb-1">{a.model}</div>
                     <div className="text-[10px] text-gray-400 leading-snug">{a.desc}</div>
                   </div>
                   {i < arr.length - 1 && (

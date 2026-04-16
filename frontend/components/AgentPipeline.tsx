@@ -31,21 +31,21 @@ const AGENTS: AgentDef[] = [
     name: "Iris",
     role: "Categorizer",
     emoji: "🔬",
-    model: "Gemini 2.5 Flash Lite",
+    model: "Groq · Llama 3.3 70B",
   },
   {
     id: "report",
     name: "Hugo",
     role: "Reporter",
     emoji: "🖊️",
-    model: "Gemini 2.5 Flash Lite",
+    model: "Gemini 2.5 Flash",
   },
   {
     id: "stella",
     name: "Stella",
     role: "Story Writer",
     emoji: "✨",
-    model: "Gemini 2.5 Flash Lite",
+    model: "Gemini 2.5 Flash",
   },
 ];
 
