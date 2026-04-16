@@ -7,8 +7,13 @@ import os
 import json
 import asyncio
 import time
+import logging
+import traceback
 from pathlib import Path
 from typing import AsyncGenerator
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger("triage")
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -199,8 +204,12 @@ async def analyze_store(body: dict):
     async def stream():
         nonlocal feedbacks
         yield sse_event("status", {"step": "scraping", "message": f"Fetching reviews for {app_entry['name']}…"})
+        requested = int(body.get("count", 100))
+        logger.info(
+            "scrape.start store=%s app_id=%s app_name=%s requested=%s",
+            store, app_entry.get("id"), app_entry.get("name"), requested,
+        )
         try:
-            requested = int(body.get("count", 100))
             if store == "googleplay":
                 feedbacks = await fetch_play_store_reviews(app_entry["id"], count=min(requested, 200))
                 source = "Google Play"
@@ -208,11 +217,23 @@ async def analyze_store(body: dict):
                 feedbacks = await fetch_app_store_reviews(app_entry["id"], count=min(requested, 50))
                 source = "App Store"
         except Exception as e:
-            yield sse_event("error", {"message": f"Scraping failed: {str(e)}"})
+            logger.error(
+                "scrape.failed store=%s app_id=%s error_type=%s error=%s\n%s",
+                store, app_entry.get("id"), type(e).__name__, str(e), traceback.format_exc(),
+            )
+            yield sse_event("error", {"message": f"Scraping failed ({type(e).__name__}): {str(e)}"})
             return
 
+        logger.info(
+            "scrape.done store=%s app_id=%s returned=%s",
+            store, app_entry.get("id"), len(feedbacks),
+        )
+
         if not feedbacks:
-            yield sse_event("error", {"message": "No reviews found for this app."})
+            yield sse_event("error", {
+                "message": f"No reviews returned by {store} for app '{app_entry.get('name')}' (id={app_entry.get('id')}). "
+                           "This usually means a rate limit or a transient block — try again in a few minutes."
+            })
             return
 
         yield sse_event("scraped", {"count": len(feedbacks), "source": source})
