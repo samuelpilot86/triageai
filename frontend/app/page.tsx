@@ -60,7 +60,7 @@ export default function Home() {
             <div className="space-y-2">
               <h2 className="text-2xl font-bold text-gray-900">Triage your app reviews in seconds</h2>
               <p className="text-sm text-gray-500">
-                Pull directly from the App Store or Google Play reviews, upload a CSV, paste feedback, or use our demo feedback samples.
+                Pull feedbacks directly from the App Store or Google Play reviews, upload a CSV, paste feedback, or use our demo feedback samples.
                 Your AI agents will categorize, prioritize, and turn them into sprint-ready cards.
               </p>
             </div>
