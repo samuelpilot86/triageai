@@ -127,9 +127,22 @@ class FeedbackTriageAgent:
     Automatically falls back to Groq (Llama 3.3 70B) on quota exhaustion.
     """
 
-    def __init__(self, api_key: str, groq_api_key: str | None = None):
+    def __init__(
+        self,
+        api_key: str,
+        groq_api_key: str | None = None,
+        openrouter_api_key: str | None = None,
+        mistral_api_key: str | None = None,
+    ):
+        from openai import AsyncOpenAI
+        from mistralai import Mistral
         self.client = genai.Client(api_key=api_key)
         self.groq_client = AsyncGroq(api_key=groq_api_key) if groq_api_key else None
+        self.openrouter_client = AsyncOpenAI(
+            api_key=openrouter_api_key,
+            base_url="https://openrouter.ai/api/v1",
+        ) if openrouter_api_key else None
+        self.mistral_client = Mistral(api_key=mistral_api_key) if mistral_api_key else None
 
     # ------------------------------------------------------------------
     # Central LLM call with fallback
@@ -201,18 +214,17 @@ IMPORTANT RULES FOR CORRECTIONS:
 
     async def _call_llm_iris(self, prompt: str, n_feedbacks: int | None = None) -> str:
         """
-        Groq-primary LLM call for Iris (categorization).
-        Tries Groq/Llama 3.3 70B first; falls back to Gemini (with retries on 503) if Groq fails.
+        Iris call chain: Groq → OpenRouter → Gemini.
+        All use Llama 3.3 70B except Gemini (Flash Lite) as last resort.
         """
         import asyncio as _asyncio
 
-        groq_error: Exception | None = None
+        n = n_feedbacks or 25
+        max_tokens = min(FALLBACK_MODEL_MAX_TOKENS, _TOKENS_OVERHEAD + n * _TOKENS_PER_FEEDBACK)
+        errors: list[str] = []
+
+        # 1. Groq
         if self.groq_client:
-            n = n_feedbacks or 25
-            max_tokens = min(
-                FALLBACK_MODEL_MAX_TOKENS,
-                _TOKENS_OVERHEAD + n * _TOKENS_PER_FEEDBACK,
-            )
             try:
                 response = await self.groq_client.chat.completions.create(
                     model=FALLBACK_MODEL,
@@ -222,11 +234,24 @@ IMPORTANT RULES FOR CORRECTIONS:
                 )
                 return response.choices[0].message.content
             except Exception as e:
-                groq_error = e  # fall through to Gemini
+                errors.append(f"Groq: {e}")
 
-        # Gemini fallback — with retries on transient 503/UNAVAILABLE
+        # 2. OpenRouter (Llama 3.3 70B free)
+        if self.openrouter_client:
+            try:
+                response = await self.openrouter_client.chat.completions.create(
+                    model="meta-llama/llama-3.3-70b-instruct:free",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.2,
+                    max_tokens=max_tokens,
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                errors.append(f"OpenRouter: {e}")
+
+        # 3. Gemini — last resort, with retries on 503
         last_error: Exception | None = None
-        for attempt in range(3):  # 1 initial + 2 retries
+        for attempt in range(3):
             try:
                 response = await self.client.aio.models.generate_content(
                     model=PRIMARY_MODEL, contents=prompt
@@ -237,17 +262,14 @@ IMPORTANT RULES FOR CORRECTIONS:
                 error_str = str(e)
                 is_retryable = "503" in error_str or "UNAVAILABLE" in error_str or "high demand" in error_str.lower()
                 if is_retryable and attempt < 2:
-                    await _asyncio.sleep(2 ** attempt)  # 1s, 2s
+                    await _asyncio.sleep(2 ** attempt)
                     continue
-                # Both Groq and Gemini failed — build a friendly combined message
                 is_quota = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower()
-                if is_quota and self.groq_client:
+                if is_quota:
+                    errors.append(f"Gemini: {error_str[:150]}")
                     raise RuntimeError(
-                        "Daily quota exhausted on both Groq and Gemini free tiers — "
-                        "retry in a few minutes (Groq rate limit resets quickly) "
-                        "or tomorrow (Gemini daily quota resets at midnight Pacific). "
-                        f"Groq error: {type(groq_error).__name__ if groq_error else 'n/a'} — "
-                        f"Gemini error: {error_str[:200]}"
+                        "All Iris models exhausted (Groq → OpenRouter → Gemini). "
+                        "Try again in a few minutes. Details: " + " | ".join(errors)
                     ) from e
                 raise
         raise last_error  # type: ignore[misc]
@@ -330,34 +352,43 @@ IMPORTANT RULES FOR CORRECTIONS:
             # All Gemini attempts failed with quota/overload
             _ = last_error  # suppress unused warning
 
-        if not self.groq_client:
-            raise RuntimeError(
-                "Gemini quota exhausted and no GROQ_API_KEY configured. "
-                "Please set GROQ_API_KEY in your Space secrets to enable fallback."
-            )
-
         if max_tokens is None:
             n = n_feedbacks or 50
-            max_tokens = min(
-                FALLBACK_MODEL_MAX_TOKENS,
-                _TOKENS_OVERHEAD + n * _TOKENS_PER_FEEDBACK,
-            )
-        try:
-            response = await self.groq_client.chat.completions.create(
-                model=FALLBACK_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=max_tokens,
-            )
-            return response.choices[0].message.content, True
-        except Exception as e:
-            error_str = str(e)
-            if "429" in error_str or "rate_limit" in error_str.lower():
-                raise RuntimeError(
-                    "Daily quota exhausted on both Gemini and Groq (free tiers). "
-                    "Please try again later — Groq resets every 24h, Gemini resets every minute."
+            max_tokens = min(FALLBACK_MODEL_MAX_TOKENS, _TOKENS_OVERHEAD + n * _TOKENS_PER_FEEDBACK)
+
+        gemini_error = str(last_error) if 'last_error' in dir() else "unknown"  # type: ignore[name-defined]
+        fallback_errors: list[str] = [f"Gemini: {gemini_error[:100]}"]
+
+        # 2. Mistral Small
+        if self.mistral_client:
+            try:
+                response = await self.mistral_client.chat.complete_async(
+                    model="mistral-small-latest",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.2,
+                    max_tokens=max_tokens,
                 )
-            raise
+                return response.choices[0].message.content, True
+            except Exception as e:
+                fallback_errors.append(f"Mistral: {e}")
+
+        # 3. Groq
+        if self.groq_client:
+            try:
+                response = await self.groq_client.chat.completions.create(
+                    model=FALLBACK_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.2,
+                    max_tokens=max_tokens,
+                )
+                return response.choices[0].message.content, True
+            except Exception as e:
+                fallback_errors.append(f"Groq: {e}")
+
+        raise RuntimeError(
+            "All Penn/Nova models exhausted (Gemini → Mistral → Groq). "
+            "Try again in a few minutes. Details: " + " | ".join(fallback_errors)
+        )
 
     # ------------------------------------------------------------------
     # Step 1: Categorization + Self-validation (single LLM call)

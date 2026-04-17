@@ -93,8 +93,12 @@ def get_agent() -> FeedbackTriageAgent:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured.")
-    groq_api_key = os.environ.get("GROQ_API_KEY")
-    return FeedbackTriageAgent(api_key=api_key, groq_api_key=groq_api_key)
+    return FeedbackTriageAgent(
+        api_key=api_key,
+        groq_api_key=os.environ.get("GROQ_API_KEY"),
+        openrouter_api_key=os.environ.get("OPENROUTER_API_KEY"),
+        mistral_api_key=os.environ.get("MISTRAL_API_KEY"),
+    )
 
 
 # ------------------------------------------------------------------
