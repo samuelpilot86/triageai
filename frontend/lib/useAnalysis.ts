@@ -163,9 +163,11 @@ export function useAnalysis() {
     } else if (event === "clustered") {
       setStep({ type: "clustering", clusterCount: d.count as number });
     } else if (event === "categorization") {
+      const fallback = (d.used_fallback as boolean) ?? false;
       setPartialItems(d.items as FeedbackItem[]);
       correctionsRef.current = (d.corrections as Correction[]) ?? [];
-      usedFallbackRef.current = (d.used_fallback as boolean) ?? false;
+      usedFallbackRef.current = fallback;
+      setStep((prev) => prev.type === "categorization" ? { ...prev, usedFallback: fallback } : prev);
     } else if (event === "report") {
       // Record report timing
       if (reportStartRef.current !== null) {

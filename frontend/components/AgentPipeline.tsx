@@ -233,7 +233,7 @@ function AgentCard({
         }`}>
           {agent.model ?? "Python scraper"}
         </span>
-        {isDone && usedFallback && FALLBACK_CHAINS[agent.id] && (
+        {usedFallback && FALLBACK_CHAINS[agent.id] && (
           <span
             title={`Fallback chain: ${FALLBACK_CHAINS[agent.id]}`}
             className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium bg-orange-100 text-orange-600 cursor-help"
