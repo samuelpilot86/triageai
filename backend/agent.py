@@ -15,6 +15,75 @@ import pandas as pd
 from google import genai
 from groq import AsyncGroq
 
+# ------------------------------------------------------------------
+# Lazy embedding model (sentence-transformers, loaded on first use)
+# ------------------------------------------------------------------
+
+_embedding_model = None
+
+def _get_embedding_model():
+    global _embedding_model
+    if _embedding_model is None:
+        from sentence_transformers import SentenceTransformer
+        _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+    return _embedding_model
+
+
+# ------------------------------------------------------------------
+# Semantic clustering
+# ------------------------------------------------------------------
+
+_PRIORITY_SCORE = {"High": 3, "Medium": 1, "Low": 0}
+
+
+def _cluster_items(items: list[dict]) -> list[dict]:
+    """
+    Clusters feedback items by semantic similarity of their Iris summaries.
+    Returns clusters sorted by priority score desc (High=3, Medium=1, Low=0).
+    Each cluster dict: {score, representative_summary, category, items}.
+    """
+    import numpy as np
+    from sklearn.cluster import KMeans
+
+    n_clusters = min(8, max(3, len(items) // 10))
+    n_clusters = min(n_clusters, len(items))
+
+    summaries = [item.get("summary") or "" for item in items]
+    embeddings = _get_embedding_model().encode(summaries, convert_to_numpy=True)
+
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
+    labels = kmeans.fit_predict(embeddings)
+
+    cluster_map: dict[int, list[int]] = {}
+    for idx, label in enumerate(labels):
+        cluster_map.setdefault(int(label), []).append(idx)
+
+    result = []
+    for label, indices in cluster_map.items():
+        cluster_items = [items[i] for i in indices]
+        score = sum(_PRIORITY_SCORE.get(it.get("priority", "Low"), 0) for it in cluster_items)
+
+        # Representative feedback: closest to centroid
+        cluster_embs = np.array([embeddings[i] for i in indices])
+        centroid = kmeans.cluster_centers_[label]
+        distances = np.linalg.norm(cluster_embs - centroid, axis=1)
+        rep_local = int(distances.argmin())
+        representative = cluster_items[rep_local]
+
+        # Majority category
+        cats = [it.get("category", "") for it in cluster_items]
+        majority_cat = max(set(cats), key=cats.count)
+
+        result.append({
+            "score": score,
+            "representative_summary": representative.get("summary", ""),
+            "category": majority_cat,
+            "items": cluster_items,
+        })
+
+    result.sort(key=lambda x: x["score"], reverse=True)
+    return result
+
 
 CATEGORIES = [
     "Bug / Error",
@@ -305,29 +374,33 @@ IMPORTANT RULES FOR CORRECTIONS:
     # Step 2: Executive report
     # ------------------------------------------------------------------
 
-    async def generate_report(self, items: list[dict], app_name: str | None = None) -> tuple[str, bool]:
+    async def generate_report(self, items: list[dict], app_name: str | None = None) -> tuple[str, list[str], list[dict], bool]:
         """
         Generates a PM executive report from the categorized feedbacks.
-        Returns (report_text, used_fallback).
+        Returns (report_text, actions, clusters, used_fallback).
+        clusters is the full sorted list from _cluster_items, passed through to generate_user_stories.
         """
         df = pd.DataFrame(items)
-
-        category_stats = df["category"].value_counts().to_dict()
         priority_stats = df["priority"].value_counts().to_dict()
         sentiment_stats = df["sentiment"].value_counts().to_dict()
 
-        # Group recurring issues by summary within each category, with frequency
-        issue_clusters = []
-        for cat, group in df[df["priority"].isin(["High", "Medium"])].groupby("category"):
-            freq = group["summary"].value_counts()
-            top_issues = [
-                {"issue": issue, "count": int(count), "priority": "High" if any(
-                    group[group["summary"] == issue]["priority"] == "High"
-                ) else "Medium"}
-                for issue, count in freq.head(4).items()
-            ]
-            issue_clusters.append({"category": cat, "total": len(group), "top_issues": top_issues})
-        issue_clusters.sort(key=lambda x: x["total"], reverse=True)
+        # Semantic clustering on Iris summaries
+        clusters = _cluster_items(items)
+
+        # Build prompt context from top 6 clusters
+        clusters_for_prompt = []
+        for c in clusters[:6]:
+            high_med = [it for it in c["items"] if it.get("priority") in ("High", "Medium")]
+            verbatims = [it["original"][:200] for it in high_med[:3]]
+            clusters_for_prompt.append({
+                "priority_score": c["score"],
+                "representative_summary": c["representative_summary"],
+                "category": c["category"],
+                "total_feedbacks": len(c["items"]),
+                "high": sum(1 for it in c["items"] if it.get("priority") == "High"),
+                "medium": sum(1 for it in c["items"] if it.get("priority") == "Medium"),
+                "verbatims": verbatims,
+            })
 
         app_context = f' for the app "{app_name}"' if app_name else ""
         app_rule = (
@@ -340,20 +413,25 @@ OVERVIEW:
 - Sentiment: {json.dumps(sentiment_stats, ensure_ascii=False)}
 - By priority: {json.dumps(priority_stats, ensure_ascii=False)}
 
-ISSUE BREAKDOWN (High + Medium priority, grouped by theme):
-{json.dumps(issue_clusters, ensure_ascii=False, indent=2)}
+ISSUE CLUSTERS (semantically grouped, sorted by priority score — High=3pts, Medium=1pt, Low=0pt):
+{json.dumps(clusters_for_prompt, ensure_ascii=False, indent=2)}
+
+Each cluster includes:
+- priority_score: sum of priority weights across all feedbacks in the cluster
+- representative_summary: the most central feedback summary in the cluster
+- verbatims: 1–3 real user quotes (original language) from High/Medium feedbacks in this cluster
 
 Return ONLY valid JSON (no markdown, no surrounding text) with this exact structure:
 {{
-  "report": "## Summary\\n[2-3 sentences on overall product health, referencing dominant issue themes specifically.]\\n\\n## Top 3 Recommended Actions\\n1. **[Action title: verb + specific component/flow]** — [What breaks, how many users, impact on retention]\\n2. **[same format]** — [same detail]\\n3. **[same format]** — [same detail]\\n\\n## Weak Signal to Watch\\n[1 non-obvious insight]",
+  "report": "## Summary\\n[2-3 sentences on overall product health, referencing specific issues from the top clusters.]\\n\\n## Top 3 Recommended Actions\\n1. **[Action title: verb + specific component/flow/feature]** — [What breaks or frustrates, evidence from verbatims, impact on retention]\\n2. **[same format]** — [same detail]\\n3. **[same format]** — [same detail]\\n\\n## Weak Signal to Watch\\n[1 non-obvious insight from a lower-ranked cluster]",
   "actions": ["exact action title 1", "exact action title 2", "exact action title 3"]
 }}
 
-Rules for report content:
-{app_rule}- Action titles: name the specific feature/flow (e.g. "Fix appointment date picker crash on iOS" not "fix bugs")
-- If multiple distinct issues share a category, pick the most impactful — mention others in justification
-- Include counts/percentages to justify prioritization
-- Actions must be specific enough to copy directly as a sprint backlog ticket title
+Rules:
+{app_rule}- Derive each action from one of the top 3 clusters in order of priority_score
+- Action titles must name the specific feature, screen, or behaviour (e.g. "Fix voice mode interruption on iOS" not "fix bugs")
+- Justify each action with data from the cluster's verbatims and counts
+- Actions must be specific enough to copy directly as sprint backlog ticket titles
 - Tone: senior product consultant, concise, decision-oriented
 - The "actions" array must contain EXACTLY the bold titles from ## Top 3 Recommended Actions, verbatim"""
 
@@ -365,34 +443,44 @@ Rules for report content:
         except Exception:
             report_md = text
             actions = []
-        return report_md, actions, used_fallback
+        return report_md, actions, clusters, used_fallback
 
     async def generate_user_stories(
-        self, items: list[dict], actions: list[str]
+        self, clusters: list[dict], actions: list[str]
     ) -> tuple[list[dict], bool]:
         """
         Generates actionable sprint cards for each of the 3 recommended actions.
+        Each action maps to the corresponding top cluster (clusters[0] → action 0, etc.).
         Format adapts to action type (bug, feature, ux, etc.) and includes RICE scoring.
         Returns (cards, used_fallback).
         """
-        df = pd.DataFrame(items)
-        mask = df["priority"].isin(["High", "Medium"])
-        if "actionable" in df.columns:
-            mask = mask & (df["actionable"] != False)  # noqa: E712
-        high_medium = df[mask][
-            ["original", "summary", "category", "priority"]
-        ].to_dict(orient="records")
+        # Build per-action feedback lists from the top 3 clusters
+        per_action_feedbacks = []
+        for i, action in enumerate(actions[:3]):
+            if i < len(clusters):
+                cluster_items = clusters[i]["items"]
+            else:
+                # Fallback: shouldn't happen, but use all items as safety net
+                cluster_items = [it for c in clusters for it in c["items"]]
+            feedbacks = [
+                {"original": it["original"], "summary": it.get("summary", ""), "priority": it.get("priority", "")}
+                for it in cluster_items
+            ]
+            per_action_feedbacks.append({"action": action, "feedbacks": feedbacks})
 
         actions_str = "\n".join(f"{i+1}. {a}" for i, a in enumerate(actions))
-        feedbacks_str = json.dumps(high_medium, ensure_ascii=False, indent=2)
+        feedbacks_str = json.dumps(per_action_feedbacks, ensure_ascii=False, indent=2)
 
+        total_items = sum(len(c["items"]) for c in clusters)
         prompt = f"""You are a senior Product Manager writing actionable sprint cards.
 
 THE 3 RECOMMENDED ACTIONS:
 {actions_str}
 
-HIGH/MEDIUM PRIORITY USER FEEDBACKS (total analyzed: {len(items)}):
+USER FEEDBACKS PER ACTION (each action is pre-matched to its semantic cluster of feedbacks):
 {feedbacks_str}
+
+Total feedbacks analyzed: {total_items}
 
 For each action, produce a card following these steps:
 
@@ -407,7 +495,7 @@ For each selected quote, detect its language. If it is NOT English, add an "tran
 with a concise English translation. If it IS English, omit the "translation" field entirely.
 
 STEP 3 — Estimate RICE:
-- reach: integer count of feedbacks (from the full list above) that directly mention this issue
+- reach: integer count of feedbacks in this action's cluster that directly address this issue
 - impact: 1=low friction | 2=significant friction or churn risk | 3=blocking or critical
 - confidence: 0.2 to 1.0 — how reliable are your estimates of R, I and E?
     Independent of reach. Ask: "How sure am I that these numbers are right?"
