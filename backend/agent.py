@@ -289,38 +289,39 @@ IMPORTANT RULES FOR CORRECTIONS:
         self, feedbacks: list[str], chunk_size: int
     ) -> tuple[list[dict], list[dict], bool]:
         """
-        Processes feedbacks in chunks (Groq TPM limit = 25/chunk).
-        Uses Groq as primary per chunk, falls back to OpenRouter then Gemini.
-        Merges results and re-sequences IDs globally.
+        Processes feedbacks in chunks (Groq TPM limit = 25/chunk), all chunks in parallel.
         Returns (items, corrections, used_fallback) — True if any chunk used a fallback.
         """
-        all_items: list[dict] = []
-        all_corrections: list[dict] = []
-        global_offset = 0
-        any_fallback = False
+        import asyncio as _asyncio
 
-        for i in range(0, len(feedbacks), chunk_size):
-            chunk = feedbacks[i : i + chunk_size]
+        chunks = [feedbacks[i: i + chunk_size] for i in range(0, len(feedbacks), chunk_size)]
+        offsets = [i * chunk_size for i in range(len(chunks))]
+
+        async def process_chunk(chunk: list[str], offset: int) -> tuple[list[dict], list[dict], bool]:
             prompt = self._build_categorization_prompt(chunk)
             text, chunk_fallback = await self._call_llm_iris(prompt, n_feedbacks=len(chunk))
-            if chunk_fallback:
-                any_fallback = True
             data = self._parse_json_response(text)
             chunk_items = data.get("feedbacks", [])
             chunk_corrections = [
                 c for c in data.get("corrections", [])
                 if c.get("old_value") != c.get("new_value")
             ]
-
-            # Re-sequence IDs globally across chunks
             for item in chunk_items:
-                item["id"] = global_offset + item["id"]
+                item["id"] = offset + item["id"]
             for correction in chunk_corrections:
-                correction["id"] = global_offset + correction["id"]
+                correction["id"] = offset + correction["id"]
+            return chunk_items, chunk_corrections, chunk_fallback
 
+        results = await _asyncio.gather(*[process_chunk(chunk, offset) for chunk, offset in zip(chunks, offsets)])
+
+        all_items: list[dict] = []
+        all_corrections: list[dict] = []
+        any_fallback = False
+        for chunk_items, chunk_corrections, chunk_fallback in results:
             all_items.extend(chunk_items)
             all_corrections.extend(chunk_corrections)
-            global_offset += len(chunk)
+            if chunk_fallback:
+                any_fallback = True
 
         return all_items, all_corrections, any_fallback
 
