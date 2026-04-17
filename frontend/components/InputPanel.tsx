@@ -292,7 +292,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
               {isSearching && <Loader2 className="absolute right-3 top-2.5 w-4 h-4 text-gray-400 animate-spin" />}
             </div>
             {searchResults.length > 0 && (
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="border border-gray-200 rounded-lg overflow-hidden max-h-64 overflow-y-auto">
                 {searchResults.map((a) => (
                   <button
                     key={String(a.id)}
