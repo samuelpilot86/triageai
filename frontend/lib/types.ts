@@ -7,7 +7,8 @@ export interface FeedbackItem {
   category: string;
   priority: "High" | "Medium" | "Low";
   priority_reason: string;
-  sentiment: "Positive" | "Neutral" | "Negative";
+  cluster_id?: number;
+  cluster_label?: string;
   actionable?: boolean;
 }
 

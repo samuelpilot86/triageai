@@ -133,6 +133,7 @@ async def analysis_stream(feedbacks: list[str], app_name: str | None = None) -> 
     yield sse_event("report", {
         "text": report,
         "used_fallback": report_fallback,
+        "items": items,
     })
 
     if actions:

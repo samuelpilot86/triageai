@@ -82,6 +82,13 @@ def _cluster_items(items: list[dict]) -> list[dict]:
         })
 
     result.sort(key=lambda x: x["score"], reverse=True)
+
+    # Tag each item with its cluster_id and cluster_label
+    for cluster_id, cluster in enumerate(result):
+        for item in cluster["items"]:
+            item["cluster_id"] = cluster_id
+            item["cluster_label"] = cluster["representative_summary"]
+
     return result
 
 
@@ -102,7 +109,7 @@ FALLBACK_MODEL = "llama-3.3-70b-versatile"
 FALLBACK_MODEL_MAX_TOKENS = 32_768  # llama-3.3-70b-versatile hard limit
 
 # Output token budget per feedback (JSON fields: original, summary, category,
-# priority, priority_reason, sentiment + corrections) + fixed overhead
+# priority, priority_reason + corrections) + fixed overhead
 _TOKENS_PER_FEEDBACK = 250
 _TOKENS_OVERHEAD = 512
 
@@ -150,7 +157,6 @@ For each feedback, determine:
   * Medium = significant friction but has a workaround
   * Low    = cosmetic improvement or edge case
 - priority_reason : justification in 10 words or fewer
-- sentiment   : "Positive", "Neutral" or "Negative"
 - actionable  : true if the feedback contains specific, identifiable product information
                 (a concrete bug, a precise feature request, a reproducible UX issue, etc.)
                 false if it is purely emotional, generic, or contains no actionable product signal
@@ -160,7 +166,6 @@ For each feedback, determine:
 Review your own decisions critically:
 - Is the category truly the most accurate one?
 - Is the priority consistent with the real product impact?
-- Does the sentiment accurately reflect the original text?
 - Are there inconsistencies across similar feedbacks?
 Apply corrections directly in the final feedbacks output.
 
@@ -174,14 +179,13 @@ Return ONLY valid JSON, no markdown, no surrounding text:
       "category": "...",
       "priority": "...",
       "priority_reason": "...",
-      "sentiment": "...",
       "actionable": true
     }}
   ],
   "corrections": [
     {{
       "id": <corrected feedback id>,
-      "field": "category" | "priority" | "sentiment",
+      "field": "category" | "priority",
       "old_value": "initial value",
       "new_value": "corrected value",
       "reason": "justification in 10 words max"
@@ -382,7 +386,6 @@ IMPORTANT RULES FOR CORRECTIONS:
         """
         df = pd.DataFrame(items)
         priority_stats = df["priority"].value_counts().to_dict()
-        sentiment_stats = df["sentiment"].value_counts().to_dict()
 
         # Semantic clustering on Iris summaries
         clusters = _cluster_items(items)
@@ -410,7 +413,6 @@ IMPORTANT RULES FOR CORRECTIONS:
         prompt = f"""You are a senior Product Manager. Generate an executive report based on this analysis of {len(items)} user feedbacks{app_context}.
 
 OVERVIEW:
-- Sentiment: {json.dumps(sentiment_stats, ensure_ascii=False)}
 - By priority: {json.dumps(priority_stats, ensure_ascii=False)}
 
 ISSUE CLUSTERS (semantically grouped, sorted by priority score — High=3pts, Medium=1pt, Low=0pt):
