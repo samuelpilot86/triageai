@@ -251,7 +251,7 @@ IMPORTANT RULES FOR CORRECTIONS:
         if self.openrouter_client:
             try:
                 response = await self.openrouter_client.chat.completions.create(
-                    model="deepseek/deepseek-r1:free",
+                    model="deepseek/deepseek-chat:free",
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.2,
                     max_tokens=max_tokens,
