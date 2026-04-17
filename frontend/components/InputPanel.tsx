@@ -10,7 +10,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7860";
 type Tab = "text" | "csv" | "store" | "demo";
 
 interface Props {
-  onAnalyzeText: (feedbacks: string[]) => void;
+  onAnalyzeText: (feedbacks: string[], appName?: string) => void;
   onAnalyzeCsv: (file: File) => void;
   onAnalyzeStore: (app: AppEntry, store: Store, count: number) => void;
   disabled?: boolean;
@@ -215,7 +215,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-400">100 real reviews from Doctolib Pro (Google Play, fr-FR)</span>
             <button
-              onClick={() => onAnalyzeText(DEMO_FEEDBACKS.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 100))}
+              onClick={() => onAnalyzeText(DEMO_FEEDBACKS.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 100), "ChatGPT")}
               disabled={disabled}
               className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-indigo-700 transition-colors shadow-sm"
             >

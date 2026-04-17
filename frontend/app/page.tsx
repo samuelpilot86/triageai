@@ -11,7 +11,7 @@ import { useAnalysis } from "@/lib/useAnalysis";
 import { RotateCcw } from "lucide-react";
 
 export default function Home() {
-  const { step, partialItems, analyzeText, analyzeCsv, analyzeStore, reset, retry } = useAnalysis();
+  const { step, partialItems, appName, analyzeText, analyzeCsv, analyzeStore, reset, retry } = useAnalysis();
   const resultsRef = useRef<HTMLDivElement>(null);
   const pipelineMetaRef = useRef<{ scrapedCount?: number; nFeedbacks?: number }>({});
 
@@ -143,6 +143,16 @@ export default function Home() {
         })()}
 
         <div ref={resultsRef} className="space-y-10">
+          {/* App name badge */}
+          {appName && (isRunning || step.type === "done") && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Analyzing</span>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
+                {appName}
+              </span>
+            </div>
+          )}
+
           {/* 1 — Agent pipeline */}
           {(isRunning || step.type === "done") && (
             <section className="py-4">
