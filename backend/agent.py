@@ -114,6 +114,14 @@ CATEGORIES = [
     "Other",
 ]
 
+def _require_content(response, source: str) -> str:
+    """Extract text content from an OpenAI-compatible response, raising if None."""
+    content = response.choices[0].message.content
+    if content is None:
+        raise RuntimeError(f"{source} returned null content (model may have refused or timed out)")
+    return content
+
+
 PRIMARY_MODEL = "gemini-2.5-flash-lite"
 FALLBACK_MODEL = "llama-3.3-70b-versatile"
 FALLBACK_MODEL_MAX_TOKENS = 32_768  # llama-3.3-70b-versatile hard limit
@@ -243,7 +251,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                     temperature=0.2,
                     max_tokens=max_tokens,
                 )
-                return response.choices[0].message.content, False
+                return _require_content(response, "Groq"), False
             except Exception as e:
                 errors.append(f"Groq: {e}")
 
@@ -256,7 +264,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                     temperature=0.2,
                     max_tokens=max_tokens,
                 )
-                return response.choices[0].message.content, True
+                return _require_content(response, "OpenRouter/Nemotron"), True
             except Exception as e:
                 errors.append(f"OpenRouter: {e}")
 
@@ -384,7 +392,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                     temperature=0.2,
                     max_tokens=max_tokens,
                 )
-                return response.choices[0].message.content, True
+                return _require_content(response, "Mistral"), True
             except Exception as e:
                 fallback_errors.append(f"Mistral: {e}")
         else:
@@ -399,7 +407,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                     temperature=0.2,
                     max_tokens=max_tokens,
                 )
-                return response.choices[0].message.content, True
+                return _require_content(response, "OpenRouter/Nemotron"), True
             except Exception as e:
                 fallback_errors.append(f"OpenRouter: {e}")
 
@@ -412,7 +420,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                     temperature=0.2,
                     max_tokens=max_tokens,
                 )
-                return response.choices[0].message.content, True
+                return _require_content(response, "Groq"), True
             except Exception as e:
                 fallback_errors.append(f"Groq: {e}")
 
