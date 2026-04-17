@@ -437,12 +437,25 @@ Rules:
 
         text, used_fallback = await self._call_llm(prompt, max_tokens=2500)
         try:
-            parsed = self._parse_json_response(text)
-            report_md = parsed.get("report", text)
+            # Strip markdown fences and sanitize literal newlines inside JSON strings
+            clean = re.sub(r"```(?:json)?\s*\n?", "", text)
+            clean = re.sub(r"\n?```", "", clean).strip()
+            # Replace literal newlines inside JSON string values with \n escape
+            clean = re.sub(r'(?<=": ")(.*?)(?="[,\n}\]])', lambda m: m.group(0).replace("\n", "\\n"), clean, flags=re.DOTALL)
+            parsed = json.loads(clean)
+            report_md = parsed.get("report", clean)
             actions = parsed.get("actions", [])
         except Exception:
-            report_md = text
-            actions = []
+            # Last resort: extract report field with regex
+            m = re.search(r'"report"\s*:\s*"(.*?)"(?=\s*,\s*"actions")', text, re.DOTALL)
+            if m:
+                report_md = m.group(1).replace("\\n", "\n").replace('\\"', '"')
+                actions_m = re.findall(r'"([^"]+)"', text.split('"actions"')[-1])
+                actions = actions_m[:3] if actions_m else []
+            else:
+                # Strip fences at minimum so raw JSON isn't shown
+                report_md = re.sub(r"```(?:json)?\s*\n?|\n?```", "", text).strip()
+                actions = []
         return report_md, actions, clusters, used_fallback
 
     async def generate_user_stories(
