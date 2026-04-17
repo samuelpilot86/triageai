@@ -32,7 +32,7 @@ function renderMarkdown(text: string) {
 }
 
 function downloadCSV(items: FeedbackItem[]) {
-  const headers = ["id", "original", "summary", "category", "priority", "priority_reason", "sentiment"];
+  const headers = ["id", "original", "summary", "category", "priority", "priority_reason", "cluster_label"];
   const rows = items.map((item) =>
     headers.map((h) => `"${String(item[h as keyof FeedbackItem] ?? "").replace(/"/g, '""')}"`).join(",")
   );
@@ -54,8 +54,6 @@ export function FeedbackStats({ items }: { items: FeedbackItem[] }) {
   const high = items.filter((i) => i.priority === "High").length;
   const medium = items.filter((i) => i.priority === "Medium").length;
   const low = items.filter((i) => i.priority === "Low").length;
-  const positive = items.filter((i) => i.sentiment === "Positive").length;
-  const negative = items.filter((i) => i.sentiment === "Negative").length;
 
   return (
     <div className="space-y-2">
@@ -69,9 +67,6 @@ export function FeedbackStats({ items }: { items: FeedbackItem[] }) {
         </button>
       </div>
       <div className="flex flex-wrap gap-2">
-        <StatPill label="Positive" value={positive} color="bg-green-100 text-green-700" />
-        <StatPill label="Negative" value={negative} color="bg-red-100 text-red-600" />
-        <div className="w-px bg-gray-200 mx-1" />
         <StatPill label="High" value={high} color="bg-red-100 text-red-700" />
         <StatPill label="Medium" value={medium} color="bg-amber-100 text-amber-700" />
         <StatPill label="Low" value={low} color="bg-emerald-100 text-emerald-700" />
@@ -112,7 +107,7 @@ export function IrisCorrections({ result }: { result: AnalysisResult }) {
       <div className="space-y-1.5 mt-2">
         {corrections.length === 0 ? (
           <p className="text-xs text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg">
-            ✓ All {items.length} feedbacks reviewed across category, priority and sentiment — no corrections needed.
+            ✓ All {items.length} feedbacks reviewed across category and priority — no corrections needed.
           </p>
         ) : (
           corrections.map((c, i) => (

@@ -7,11 +7,6 @@ const PRIORITY_BADGE: Record<string, string> = {
   Medium: "bg-amber-100 text-amber-700",
   Low: "bg-emerald-100 text-emerald-700",
 };
-const SENTIMENT_BADGE: Record<string, string> = {
-  Positive: "bg-green-100 text-green-700",
-  Neutral: "bg-gray-100 text-gray-600",
-  Negative: "bg-red-100 text-red-600",
-};
 const CATEGORY_EMOJI: Record<string, string> = {
   "Bug / Error": "🐛",
   "Feature Request": "✨",
@@ -62,7 +57,7 @@ export default function FeedbackTable({
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Category</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Priority</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Reason</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Sentiment</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Group</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -90,9 +85,13 @@ export default function FeedbackTable({
               </td>
               <td className="px-4 py-3 text-gray-500 text-xs">{item.priority_reason}</td>
               <td className="px-4 py-3">
-                <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${SENTIMENT_BADGE[item.sentiment] ?? ""}`}>
-                  {item.sentiment}
-                </span>
+                {item.cluster_label ? (
+                  <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600 max-w-[160px] truncate" title={item.cluster_label}>
+                    {item.cluster_label}
+                  </span>
+                ) : (
+                  <span className="text-gray-300 text-xs">—</span>
+                )}
               </td>
             </tr>
             );

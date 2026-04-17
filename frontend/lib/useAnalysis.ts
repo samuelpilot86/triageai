@@ -174,6 +174,10 @@ export function useAnalysis() {
         text: d.text as string,
         fallback: d.used_fallback as boolean,
       };
+      // Update items with cluster info if present
+      if (Array.isArray(d.items) && d.items.length > 0) {
+        setPartialItems(d.items as FeedbackItem[]);
+      }
       setPartialItems((items) => {
         setStep({ type: "done", result: buildResult(items) });
         return items;
