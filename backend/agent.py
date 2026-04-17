@@ -201,6 +201,8 @@ Review your own decisions critically:
 - Are there inconsistencies across similar feedbacks?
 Apply corrections directly in the final feedbacks output.
 
+IMPORTANT: Return ALL feedbacks in the array, including non-actionable ones. Do NOT skip or omit any feedback.
+
 Return ONLY valid JSON, no markdown, no surrounding text:
 {{
   "feedbacks": [
