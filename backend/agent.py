@@ -386,8 +386,23 @@ IMPORTANT RULES FOR CORRECTIONS:
                 return response.choices[0].message.content, True
             except Exception as e:
                 fallback_errors.append(f"Mistral: {e}")
+        else:
+            fallback_errors.append("Mistral: not configured (MISTRAL_API_KEY missing?)")
 
-        # 3. Groq
+        # 3. OpenRouter (Nemotron 120B — NVIDIA infra, independent of Google/Groq)
+        if self.openrouter_client:
+            try:
+                response = await self.openrouter_client.chat.completions.create(
+                    model="nvidia/nemotron-3-super-120b-a12b:free",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.2,
+                    max_tokens=max_tokens,
+                )
+                return response.choices[0].message.content, True
+            except Exception as e:
+                fallback_errors.append(f"OpenRouter: {e}")
+
+        # 4. Groq
         if self.groq_client:
             try:
                 response = await self.groq_client.chat.completions.create(
@@ -401,7 +416,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                 fallback_errors.append(f"Groq: {e}")
 
         raise RuntimeError(
-            "All Penn/Nova models exhausted (Gemini → Mistral → Groq). "
+            "All Penn/Nova models exhausted (Gemini → Mistral → OpenRouter → Groq). "
             "Try again in a few minutes. Details: " + " | ".join(fallback_errors)
         )
 
@@ -652,7 +667,7 @@ Return ONLY a valid JSON array, no markdown, no surrounding text:
             return ""
 
     def _parse_json_response(self, text: str) -> dict:
-        """Cleans and parses the LLM JSON response. Handles truncated JSON."""
+        """Cleans and parses the LLM JSON response. Handles truncated JSON. Never raises."""
         if not text:
             return {}
         text = text.strip()
@@ -664,20 +679,37 @@ Return ONLY a valid JSON array, no markdown, no surrounding text:
         if not text:
             return {}
 
+        # Try direct parse
         try:
             return json.loads(text)
         except json.JSONDecodeError:
-            # Response was likely truncated — attempt to recover the feedbacks array
-            match = re.search(r'"feedbacks"\s*:\s*(\[.*)', text, re.DOTALL)
-            if not match:
-                raise
+            pass
+
+        # Try to extract JSON object {...} from surrounding text
+        match = re.search(r'\{.*\}', text, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except json.JSONDecodeError:
+                pass
+
+        # Response was likely truncated — attempt to recover the feedbacks array
+        match = re.search(r'"feedbacks"\s*:\s*(\[.*)', text, re.DOTALL)
+        if match:
             array_text = match.group(1)
-            # Find the last complete object (ending with })
             last_complete = array_text.rfind("},")
             if last_complete == -1:
                 last_complete = array_text.rfind("}")
-            if last_complete == -1:
-                raise
-            recovered = array_text[: last_complete + 1] + "]"
-            feedbacks = json.loads(recovered)
-            return {"feedbacks": feedbacks, "corrections": []}
+            if last_complete != -1:
+                try:
+                    feedbacks = json.loads(array_text[: last_complete + 1] + "]")
+                    return {"feedbacks": feedbacks, "corrections": []}
+                except json.JSONDecodeError:
+                    pass
+
+        # Nothing worked — log and return empty so the chunk is skipped gracefully
+        import logging as _logging
+        _logging.getLogger("triage").warning(
+            "_parse_json_response: could not parse response (first 300 chars): %s", text[:300]
+        )
+        return {}
