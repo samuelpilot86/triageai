@@ -15,6 +15,16 @@ import pandas as pd
 from google import genai
 from groq import AsyncGroq
 
+try:
+    from openai import AsyncOpenAI as _AsyncOpenAI
+except ImportError:
+    _AsyncOpenAI = None  # type: ignore
+
+try:
+    from mistralai import Mistral as _Mistral
+except ImportError:
+    _Mistral = None  # type: ignore
+
 # ------------------------------------------------------------------
 # Lazy embedding model (sentence-transformers, loaded on first use)
 # ------------------------------------------------------------------
@@ -134,15 +144,16 @@ class FeedbackTriageAgent:
         openrouter_api_key: str | None = None,
         mistral_api_key: str | None = None,
     ):
-        from openai import AsyncOpenAI
-        from mistralai import Mistral
         self.client = genai.Client(api_key=api_key)
         self.groq_client = AsyncGroq(api_key=groq_api_key) if groq_api_key else None
-        self.openrouter_client = AsyncOpenAI(
-            api_key=openrouter_api_key,
-            base_url="https://openrouter.ai/api/v1",
-        ) if openrouter_api_key else None
-        self.mistral_client = Mistral(api_key=mistral_api_key) if mistral_api_key else None
+        self.openrouter_client = (
+            _AsyncOpenAI(api_key=openrouter_api_key, base_url="https://openrouter.ai/api/v1")
+            if openrouter_api_key and _AsyncOpenAI is not None else None
+        )
+        self.mistral_client = (
+            _Mistral(api_key=mistral_api_key)
+            if mistral_api_key and _Mistral is not None else None
+        )
 
     # ------------------------------------------------------------------
     # Central LLM call with fallback
