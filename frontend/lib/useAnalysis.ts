@@ -104,6 +104,7 @@ function streamEvents(
 export function useAnalysis() {
   const [step, setStep] = useState<AnalysisStep>({ type: "idle" });
   const [partialItems, setPartialItems] = useState<FeedbackItem[]>([]);
+  const [appName, setAppName] = useState<string | null>(null);
   const correctionsRef = useRef<Correction[]>([]);
   const usedFallbackRef = useRef<boolean>(false);
   const reportRef = useRef<{ text: string; fallback: boolean } | null>(null);
@@ -116,6 +117,7 @@ export function useAnalysis() {
   const reset = useCallback(() => {
     setStep({ type: "idle" });
     setPartialItems([]);
+    setAppName(null);
     correctionsRef.current = [];
     usedFallbackRef.current = false;
     reportRef.current = null;
@@ -201,7 +203,8 @@ export function useAnalysis() {
     return launchStream();
   }, []);
 
-  const analyzeText = useCallback((feedbacks: string[]) => {
+  const analyzeText = useCallback((feedbacks: string[], name?: string) => {
+    setAppName(name ?? null);
     const call = () => startCategorization(feedbacks.length, () =>
       streamEvents(
         `${API_BASE}/api/analyze/text`,
@@ -235,6 +238,7 @@ export function useAnalysis() {
   }, [handleEvents, startCategorization]);
 
   const analyzeStore = useCallback((app: AppEntry, store: Store, count: number = 100) => {
+    setAppName(app.name ?? null);
     // Store: scraping phase first, categorization estimate set when scraped arrives
     const call = () => {
       setStep({ type: "scraping" });
@@ -273,5 +277,5 @@ export function useAnalysis() {
     if (lastCallRef.current) return lastCallRef.current();
   }, []);
 
-  return { step, partialItems, analyzeText, analyzeCsv, analyzeStore, reset, retry };
+  return { step, partialItems, appName, analyzeText, analyzeCsv, analyzeStore, reset, retry };
 }
