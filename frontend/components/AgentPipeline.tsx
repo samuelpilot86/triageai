@@ -168,16 +168,24 @@ function IrisProgressBar({
 // Single agent card
 // ------------------------------------------------------------------
 
+const FALLBACK_CHAINS: Record<string, string> = {
+  categorization: "Groq · Llama 3.3 70B → OpenRouter · DeepSeek R1 → Gemini 2.5 Flash Lite",
+  report: "Gemini 2.5 Flash Lite → Mistral Small → Groq · Llama 3.3 70B",
+  stella: "Gemini 2.5 Flash Lite → Mistral Small → Groq · Llama 3.3 70B",
+};
+
 function AgentCard({
   agent,
   status,
   step,
   stat,
+  usedFallback,
 }: {
   agent: AgentDef;
   status: AgentStatus;
   step: AnalysisStep;
   stat?: AgentStat;
+  usedFallback?: boolean;
 }) {
   if (status === "hidden") return null;
 
@@ -216,29 +224,24 @@ function AgentCard({
         </div>
       </div>
 
-      {/* Model badge */}
-      {agent.model && (
-        <div className="mt-2">
-          <span className={`inline-block text-xs px-1.5 py-0.5 rounded font-mono ${
-            isActive ? "bg-indigo-100 text-indigo-600" :
-            isDone ? "bg-emerald-100 text-emerald-600" :
-            "bg-gray-100 text-gray-500"
-          }`}>
-            {agent.model}
+      {/* Model badge + fallback indicator */}
+      <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+        <span className={`inline-block text-xs px-1.5 py-0.5 rounded font-mono ${
+          isActive ? "bg-indigo-100 text-indigo-600" :
+          isDone ? "bg-emerald-100 text-emerald-600" :
+          "bg-gray-100 text-gray-500"
+        }`}>
+          {agent.model ?? "Python scraper"}
+        </span>
+        {isDone && usedFallback && FALLBACK_CHAINS[agent.id] && (
+          <span
+            title={`Fallback chain: ${FALLBACK_CHAINS[agent.id]}`}
+            className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium bg-orange-100 text-orange-600 cursor-help"
+          >
+            ↩ fallback
           </span>
-        </div>
-      )}
-      {!agent.model && (
-        <div className="mt-2">
-          <span className={`inline-block text-xs px-1.5 py-0.5 rounded font-mono ${
-            isActive ? "bg-indigo-100 text-indigo-600" :
-            isDone ? "bg-emerald-100 text-emerald-600" :
-            "bg-gray-100 text-gray-500"
-          }`}>
-            Python scraper
-          </span>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Stat when done */}
       {isDone && stat && (
@@ -279,11 +282,15 @@ export default function AgentPipeline({
   scrapedCount,
   nFeedbacks,
   clusterCount,
+  irisFallback,
+  reportFallback,
 }: {
   step: AnalysisStep;
   scrapedCount?: number;
   nFeedbacks?: number;
   clusterCount?: number;
+  irisFallback?: boolean;
+  reportFallback?: boolean;
 }) {
   // isScraping is true as soon as scrapedCount is set (persisted by pipelineMetaRef in page.tsx),
   // OR while the scraping step is active — so Webb stays visible through the entire analysis.
@@ -302,6 +309,12 @@ export default function AgentPipeline({
     stats["clustering"] = { label: `${clusterCount} clusters formed` };
   }
 
+  const fallbacks: Record<string, boolean> = {
+    categorization: irisFallback ?? false,
+    report: reportFallback ?? false,
+    stella: reportFallback ?? false,
+  };
+
   const visibleAgents = AGENTS.filter((a) => statuses[a.id] !== "hidden");
 
   return (
@@ -317,6 +330,7 @@ export default function AgentPipeline({
               status={statuses[agent.id]}
               step={step}
               stat={stats[agent.id]}
+              usedFallback={fallbacks[agent.id] ?? false}
             />
             {i < visibleAgents.length - 1 && (
               <Arrow active={statuses[agent.id] === "done"} />
