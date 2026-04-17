@@ -656,9 +656,13 @@ Return ONLY a valid JSON array, no markdown, no surrounding text:
         if not text:
             return {}
         text = text.strip()
+        # Strip <think>...</think> reasoning blocks (Nemotron, DeepSeek R1, etc.)
+        text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
         text = re.sub(r"```(?:json)?\s*\n?", "", text)
         text = re.sub(r"\n?```", "", text)
         text = text.strip()
+        if not text:
+            return {}
 
         try:
             return json.loads(text)
