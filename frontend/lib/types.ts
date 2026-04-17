@@ -65,7 +65,7 @@ export interface AnalysisResult {
 export type AnalysisStep =
   | { type: "idle" }
   | { type: "scraping" }
-  | { type: "categorization"; estimatedMs?: number; startedAt?: number; nFeedbacks?: number; scrapedCount?: number }
+  | { type: "categorization"; estimatedMs?: number; startedAt?: number; nFeedbacks?: number; scrapedCount?: number; usedFallback?: boolean }
   | { type: "clustering"; clusterCount?: number }
   | { type: "report"; estimatedMs?: number; startedAt?: number }
   | { type: "done"; result: AnalysisResult }

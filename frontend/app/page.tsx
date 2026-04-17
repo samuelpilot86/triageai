@@ -165,7 +165,11 @@ export default function Home() {
                 scrapedCount={pipelineMetaRef.current.scrapedCount}
                 nFeedbacks={pipelineMetaRef.current.nFeedbacks}
                 clusterCount={pipelineMetaRef.current.clusterCount}
-                irisFallback={step.type === "done" ? step.result.used_fallback : undefined}
+                irisFallback={
+                  step.type === "done" ? step.result.used_fallback :
+                  step.type === "categorization" ? step.usedFallback :
+                  undefined
+                }
                 reportFallback={step.type === "done" ? step.result.report_fallback : undefined}
               />
             </section>
