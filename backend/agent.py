@@ -247,11 +247,11 @@ IMPORTANT RULES FOR CORRECTIONS:
             except Exception as e:
                 errors.append(f"Groq: {e}")
 
-        # 2. OpenRouter (Gemma 4 26B free)
+        # 2. OpenRouter (NVIDIA Nemotron 3 Super 120B — infra NVIDIA, independent of Google/Groq)
         if self.openrouter_client:
             try:
                 response = await self.openrouter_client.chat.completions.create(
-                    model="google/gemma-4-26b-a4b-it:free",
+                    model="nvidia/nemotron-3-super-120b-a12b:free",
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.2,
                     max_tokens=max_tokens,
