@@ -122,10 +122,27 @@ async def analysis_stream(feedbacks: list[str], app_name: str | None = None) -> 
         "used_fallback": used_fallback,
     })
 
+    # ------------------------------------------------------------------
+    # Echo — semantic clustering
+    # ------------------------------------------------------------------
+    yield sse_event("status", {"step": "clustering", "message": "Grouping feedbacks by topic…"})
+
+    from agent import _cluster_items
+    try:
+        clusters = await asyncio.get_event_loop().run_in_executor(None, lambda: _cluster_items(items))
+    except Exception as e:
+        yield sse_event("error", {"message": f"Clustering failed: {e}"})
+        return
+
+    yield sse_event("clustered", {"count": len(clusters)})
+
+    # ------------------------------------------------------------------
+    # Penn — executive report
+    # ------------------------------------------------------------------
     yield sse_event("status", {"step": "report", "message": "Generating executive report…"})
 
     try:
-        report, actions, clusters, report_fallback = await agent.generate_report(items, app_name=app_name)
+        report, actions, report_fallback = await agent.generate_report(items, clusters, app_name=app_name)
     except Exception as e:
         yield sse_event("error", {"message": str(e)})
         return

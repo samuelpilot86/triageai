@@ -155,10 +155,13 @@ export function useAnalysis() {
         });
       }
       // "categorization" status is set by startCategorization with the estimate
+      else if (s === "clustering") setStep({ type: "clustering" });
     } else if (event === "scraped") {
       setStep((prev) =>
         prev.type === "categorization" ? prev : { type: "categorization" }
       );
+    } else if (event === "clustered") {
+      setStep({ type: "clustering", clusterCount: d.count as number });
     } else if (event === "categorization") {
       setPartialItems(d.items as FeedbackItem[]);
       correctionsRef.current = (d.corrections as Correction[]) ?? [];
