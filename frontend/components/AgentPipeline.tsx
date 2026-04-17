@@ -169,7 +169,7 @@ function IrisProgressBar({
 // ------------------------------------------------------------------
 
 const FALLBACK_CHAINS: Record<string, string> = {
-  categorization: "Groq · Llama 3.3 70B → OpenRouter · DeepSeek V3 → Gemini 2.5 Flash Lite",
+  categorization: "Groq · Llama 3.3 70B → OpenRouter · Gemma 4 26B → Gemini 2.5 Flash Lite",
   report: "Gemini 2.5 Flash Lite → Mistral Small → Groq · Llama 3.3 70B",
   stella: "Gemini 2.5 Flash Lite → Mistral Small → Groq · Llama 3.3 70B",
 };
