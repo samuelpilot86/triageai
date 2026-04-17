@@ -258,13 +258,18 @@ IMPORTANT RULES FOR CORRECTIONS:
                 errors.append(f"Groq: {e}")
 
         # 2. OpenRouter (NVIDIA Nemotron 3 Super 120B — infra NVIDIA, independent of Google/Groq)
+        # Cap at 4096 tokens: free tier has tighter output limits; timeout at 45s per chunk.
         if self.openrouter_client:
             try:
-                response = await self.openrouter_client.chat.completions.create(
-                    model="nvidia/nemotron-3-super-120b-a12b:free",
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.2,
-                    max_tokens=max_tokens,
+                import asyncio as _asyncio
+                response = await _asyncio.wait_for(
+                    self.openrouter_client.chat.completions.create(
+                        model="nvidia/nemotron-3-super-120b-a12b:free",
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.2,
+                        max_tokens=min(max_tokens, 4096),
+                    ),
+                    timeout=45,
                 )
                 return _require_content(response, "OpenRouter/Nemotron"), True
             except Exception as e:
