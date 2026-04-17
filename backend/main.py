@@ -125,7 +125,7 @@ async def analysis_stream(feedbacks: list[str], app_name: str | None = None) -> 
     yield sse_event("status", {"step": "report", "message": "Generating executive report…"})
 
     try:
-        report, actions, report_fallback = await agent.generate_report(items, app_name=app_name)
+        report, actions, clusters, report_fallback = await agent.generate_report(items, app_name=app_name)
     except Exception as e:
         yield sse_event("error", {"message": str(e)})
         return
@@ -138,7 +138,7 @@ async def analysis_stream(feedbacks: list[str], app_name: str | None = None) -> 
     if actions:
         yield sse_event("status", {"step": "report", "message": "Generating user story cards…"})
         try:
-            cards, cards_fallback = await agent.generate_user_stories(items, actions)
+            cards, cards_fallback = await agent.generate_user_stories(clusters, actions)
             yield sse_event("user_stories", {
                 "cards": cards,
                 "used_fallback": cards_fallback,
