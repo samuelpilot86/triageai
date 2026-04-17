@@ -13,12 +13,15 @@ import { RotateCcw } from "lucide-react";
 export default function Home() {
   const { step, partialItems, appName, analyzeText, analyzeCsv, analyzeStore, reset, retry } = useAnalysis();
   const resultsRef = useRef<HTMLDivElement>(null);
-  const pipelineMetaRef = useRef<{ scrapedCount?: number; nFeedbacks?: number }>({});
+  const pipelineMetaRef = useRef<{ scrapedCount?: number; nFeedbacks?: number; clusterCount?: number }>({});
 
   // Persist pipeline metadata across step transitions
   if (step.type === "categorization") {
     if (step.scrapedCount !== undefined) pipelineMetaRef.current.scrapedCount = step.scrapedCount;
     if (step.nFeedbacks !== undefined) pipelineMetaRef.current.nFeedbacks = step.nFeedbacks;
+  }
+  if (step.type === "clustering") {
+    if (step.clusterCount !== undefined) pipelineMetaRef.current.clusterCount = step.clusterCount;
   }
 
   const isRunning = step.type !== "idle" && step.type !== "done" && step.type !== "error";
@@ -82,6 +85,7 @@ export default function Home() {
               {[
                 { emoji: "🕸️", name: "Webb", role: "Web Scraper", model: "Python scraper", desc: "Pulls reviews from App Store & Google Play" },
                 { emoji: "🔬", name: "Iris", role: "Categorizer", model: "Groq · Llama 3.3 70B", desc: "Tags & prioritizes every feedback" },
+                { emoji: "🗂️", name: "Echo", role: "Cluster Analyst", model: "sentence-transformers", desc: "Groups feedbacks by semantic similarity" },
                 { emoji: "🖊️", name: "Penn", role: "Reporter", model: "Gemini 2.5 Flash", desc: "Writes the executive summary" },
                 { emoji: "✨", name: "Nova", role: "Backlog Builder", model: "Gemini 2.5 Flash", desc: "Generates sprint cards with RICE scoring" },
               ].map((a, i, arr) => (
@@ -160,6 +164,7 @@ export default function Home() {
                 step={step}
                 scrapedCount={pipelineMetaRef.current.scrapedCount}
                 nFeedbacks={pipelineMetaRef.current.nFeedbacks}
+                clusterCount={pipelineMetaRef.current.clusterCount}
               />
             </section>
           )}

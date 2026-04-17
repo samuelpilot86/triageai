@@ -378,17 +378,14 @@ IMPORTANT RULES FOR CORRECTIONS:
     # Step 2: Executive report
     # ------------------------------------------------------------------
 
-    async def generate_report(self, items: list[dict], app_name: str | None = None) -> tuple[str, list[str], list[dict], bool]:
+    async def generate_report(self, items: list[dict], clusters: list[dict], app_name: str | None = None) -> tuple[str, list[str], bool]:
         """
         Generates a PM executive report from the categorized feedbacks.
-        Returns (report_text, actions, clusters, used_fallback).
-        clusters is the full sorted list from _cluster_items, passed through to generate_user_stories.
+        clusters must be pre-computed by _cluster_items (called externally so Echo step can be tracked).
+        Returns (report_text, actions, used_fallback).
         """
         df = pd.DataFrame(items)
         priority_stats = df["priority"].value_counts().to_dict()
-
-        # Semantic clustering on Iris summaries
-        clusters = _cluster_items(items)
 
         # Build prompt context from top 6 clusters
         clusters_for_prompt = []
@@ -458,7 +455,7 @@ Rules:
                 # Strip fences at minimum so raw JSON isn't shown
                 report_md = re.sub(r"```(?:json)?\s*\n?|\n?```", "", text).strip()
                 actions = []
-        return report_md, actions, clusters, used_fallback
+        return report_md, actions, used_fallback
 
     async def generate_user_stories(
         self, clusters: list[dict], actions: list[str]

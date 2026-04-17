@@ -34,6 +34,13 @@ const AGENTS: AgentDef[] = [
     model: "Groq · Llama 3.3 70B",
   },
   {
+    id: "clustering",
+    name: "Echo",
+    role: "Cluster Analyst",
+    emoji: "🗂️",
+    model: "sentence-transformers",
+  },
+  {
     id: "report",
     name: "Penn",
     role: "Reporter",
@@ -64,14 +71,16 @@ function deriveStatuses(
   isScraping: boolean
 ): Record<string, AgentStatus> {
   const order = isScraping
-    ? ["scraping", "categorization", "report", "stella"]
-    : ["categorization", "report", "stella"];
+    ? ["scraping", "categorization", "clustering", "report", "stella"]
+    : ["categorization", "clustering", "report", "stella"];
 
   const activeId =
     step.type === "scraping"
       ? "scraping"
       : step.type === "categorization"
       ? "categorization"
+      : step.type === "clustering"
+      ? "clustering"
       : step.type === "report"
       ? "report"
       : step.type === "done"
@@ -269,10 +278,12 @@ export default function AgentPipeline({
   step,
   scrapedCount,
   nFeedbacks,
+  clusterCount,
 }: {
   step: AnalysisStep;
   scrapedCount?: number;
   nFeedbacks?: number;
+  clusterCount?: number;
 }) {
   // isScraping is true as soon as scrapedCount is set (persisted by pipelineMetaRef in page.tsx),
   // OR while the scraping step is active — so Webb stays visible through the entire analysis.
@@ -286,6 +297,9 @@ export default function AgentPipeline({
   }
   if (nFeedbacks !== undefined && statuses["categorization"] === "done") {
     stats["categorization"] = { label: `${nFeedbacks} feedbacks categorized` };
+  }
+  if (clusterCount !== undefined && statuses["clustering"] === "done") {
+    stats["clustering"] = { label: `${clusterCount} clusters formed` };
   }
 
   const visibleAgents = AGENTS.filter((a) => statuses[a.id] !== "hidden");
