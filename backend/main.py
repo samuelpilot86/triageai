@@ -282,9 +282,9 @@ async def search_apps(store: str = Query("googleplay"), q: str = Query(...)):
     if not q.strip():
         return {"apps": []}
     if store == "googleplay":
-        apps = await search_googleplay_apps(q.strip(), count=8)
+        apps = await search_googleplay_apps(q.strip(), count=15)
     else:
-        apps = await search_appstore_apps(q.strip(), count=8)
+        apps = await search_appstore_apps(q.strip(), count=15)
     return {"apps": apps}
 
 

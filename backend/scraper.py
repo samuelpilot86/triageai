@@ -193,7 +193,7 @@ async def search_googleplay_apps(query: str, count: int = 8) -> list[dict]:
     try:
         results = await loop.run_in_executor(
             None,
-            lambda: gp_search(query, n_hits=max(count, 15), lang="en", country="us"),
+            lambda: gp_search(query, n_hits=count, lang="en", country="us"),
         )
         return [
             {"id": r["appId"], "name": r["title"], "store": "googleplay"}
