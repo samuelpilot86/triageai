@@ -195,11 +195,34 @@ async def search_googleplay_apps(query: str, count: int = 8) -> list[dict]:
             None,
             lambda: gp_search(query, n_hits=count, lang="en", country="us"),
         )
-        return [
-            {"id": r["appId"], "name": r["title"], "store": "googleplay"}
-            for r in results
-            if r.get("appId") and r.get("title")
-        ][:count]
+
+        # Resolve missing appIds (bug in library for featured apps like Google Maps)
+        resolved = []
+        unresolved = []
+        for r in results:
+            if r.get("appId") and r.get("title"):
+                resolved.append({"id": r["appId"], "name": r["title"], "store": "googleplay"})
+            elif r.get("title") and r.get("developer"):
+                unresolved.append(r)
+
+        for r in unresolved:
+            try:
+                fallback = await loop.run_in_executor(
+                    None,
+                    lambda title=r["title"], dev=r["developer"]: gp_search(
+                        f"{title} {dev}", n_hits=3, lang="en", country="us"
+                    ),
+                )
+                match = next(
+                    (f for f in fallback if f.get("appId") and f.get("title") == r["title"]),
+                    None,
+                )
+                if match:
+                    resolved.append({"id": match["appId"], "name": match["title"], "store": "googleplay"})
+            except Exception:
+                pass
+
+        return resolved[:count]
     except Exception:
         return []
 
