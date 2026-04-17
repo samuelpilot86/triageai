@@ -142,20 +142,26 @@ export function useAnalysis() {
       const s = d.step as string;
       if (s === "scraping") setStep({ type: "scraping" });
       else if (s === "report") {
-        // Record categorization timing, then fetch report estimate
+        // Set step immediately so Penn card activates without waiting for the fetch
+        const startedAt = Date.now();
+        reportStartRef.current = startedAt;
+        setStep({ type: "report", startedAt });
+        // Record categorization timing
         if (categorizationStartRef.current !== null && nFeedbacksRef.current > 0) {
-          const elapsed = Date.now() - categorizationStartRef.current;
+          const elapsed = startedAt - categorizationStartRef.current;
           recordTiming("categorization", elapsed, nFeedbacksRef.current);
           categorizationStartRef.current = null;
         }
+        // Fetch estimate and fill it in once available
         fetchTimingEstimate("report").then((estimatedMs) => {
-          const startedAt = Date.now();
-          reportStartRef.current = startedAt;
-          setStep({ type: "report", estimatedMs, startedAt });
+          setStep((prev) => prev.type === "report" ? { ...prev, estimatedMs } : prev);
         });
       }
-      // "categorization" status is set by startCategorization with the estimate
-      else if (s === "clustering") setStep({ type: "clustering" });
+      else if (s === "clustering") {
+        // Start Echo timer + fetch estimate (cluster timing not persisted, use fixed fallback)
+        const startedAt = Date.now();
+        setStep({ type: "clustering", startedAt, estimatedMs: 8_000 });
+      }
     } else if (event === "scraped") {
       setStep((prev) =>
         prev.type === "categorization" ? prev : { type: "categorization" }

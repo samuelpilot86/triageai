@@ -39,6 +39,7 @@ const TAB_META: Record<Tab, { label: string; icon: React.ReactNode }> = {
 export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore, disabled }: Props) {
   const [tab, setTab] = useState<Tab>("demo");
   const [text, setText] = useState("");
+  const [demoText, setDemoText] = useState(DEMO_FEEDBACKS);
   const [dragOver, setDragOver] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [store, setStore] = useState<Store>("googleplay");
@@ -208,15 +209,16 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
       {tab === "demo" && (
         <div className="space-y-3">
           <textarea
-            readOnly
-            value={DEMO_FEEDBACKS}
-            className="w-full h-52 px-4 py-3 text-sm rounded-xl border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-500"
+            value={demoText}
+            onChange={(e) => setDemoText(e.target.value)}
+            disabled={disabled}
+            className="w-full h-52 px-4 py-3 text-sm rounded-xl border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-500 disabled:opacity-60"
           />
           <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">100 real reviews from Doctolib Pro (Google Play, fr-FR)</span>
+            <span className="text-xs text-gray-400">100 real ChatGPT reviews (Google Play, en-US) — edit to remove some</span>
             <button
-              onClick={() => onAnalyzeText(DEMO_FEEDBACKS.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 100), "ChatGPT")}
-              disabled={disabled}
+              onClick={() => onAnalyzeText(demoText.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 100), "ChatGPT")}
+              disabled={disabled || demoText.split("\n").filter((l) => l.trim()).length < 2}
               className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-indigo-700 transition-colors shadow-sm"
             >
               <Zap className="w-4 h-4" />

@@ -248,8 +248,11 @@ function AgentCard({
         <p className="mt-2 text-xs text-emerald-600 font-medium">{stat.label}</p>
       )}
 
-      {/* Progress bar for Iris (categorization) or Hugo (report) when active */}
+      {/* Progress bars */}
       {isActive && agent.id === "categorization" && step.type === "categorization" && (
+        <IrisProgressBar startedAt={step.startedAt} estimatedMs={step.estimatedMs} />
+      )}
+      {isActive && agent.id === "clustering" && step.type === "clustering" && (
         <IrisProgressBar startedAt={step.startedAt} estimatedMs={step.estimatedMs} />
       )}
       {isActive && agent.id === "report" && step.type === "report" && (
