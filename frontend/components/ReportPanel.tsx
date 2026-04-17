@@ -87,8 +87,11 @@ export function FallbackBanner({ used_fallback, report_fallback }: { used_fallba
 export function ExecutiveReport({ report }: { report: string }) {
   if (!report) return null;
   return (
-    <div className="border border-gray-200 rounded-xl p-5 space-y-1">
-      <h2 className="text-sm font-semibold text-gray-900 mb-3">Executive Report</h2>
+    <div className="border border-gray-200 rounded-xl p-6 space-y-1">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-lg">🖊️</span>
+        <h2 className="text-xl font-bold tracking-tight text-gray-900">Executive Report</h2>
+      </div>
       <ol className="list-none space-y-0.5">{renderMarkdown(report)}</ol>
     </div>
   );
