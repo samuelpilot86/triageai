@@ -223,10 +223,10 @@ IMPORTANT RULES FOR CORRECTIONS:
 - If a field needed no change, do NOT include it in corrections at all.
 - If no fields needed changing, return "corrections": []."""
 
-    async def _call_llm_iris(self, prompt: str, n_feedbacks: int | None = None) -> str:
+    async def _call_llm_iris(self, prompt: str, n_feedbacks: int | None = None) -> tuple[str, bool]:
         """
         Iris call chain: Groq → OpenRouter → Gemini.
-        All use Llama 3.3 70B except Gemini (Flash Lite) as last resort.
+        Returns (text, used_fallback) where used_fallback=True if Groq was unavailable.
         """
         import asyncio as _asyncio
 
@@ -243,11 +243,11 @@ IMPORTANT RULES FOR CORRECTIONS:
                     temperature=0.2,
                     max_tokens=max_tokens,
                 )
-                return response.choices[0].message.content
+                return response.choices[0].message.content, False
             except Exception as e:
                 errors.append(f"Groq: {e}")
 
-        # 2. OpenRouter (DeepSeek R1 free — routed via DeepSeek, not Venice)
+        # 2. OpenRouter (Gemma 4 26B free)
         if self.openrouter_client:
             try:
                 response = await self.openrouter_client.chat.completions.create(
@@ -256,7 +256,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                     temperature=0.2,
                     max_tokens=max_tokens,
                 )
-                return response.choices[0].message.content
+                return response.choices[0].message.content, True
             except Exception as e:
                 errors.append(f"OpenRouter: {e}")
 
@@ -267,7 +267,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                 response = await self.client.aio.models.generate_content(
                     model=PRIMARY_MODEL, contents=prompt
                 )
-                return self._extract_text(response)
+                return self._extract_text(response), True
             except Exception as e:
                 last_error = e
                 error_str = str(e)
@@ -287,20 +287,24 @@ IMPORTANT RULES FOR CORRECTIONS:
 
     async def _categorize_chunked(
         self, feedbacks: list[str], chunk_size: int
-    ) -> tuple[list[dict], list[dict]]:
+    ) -> tuple[list[dict], list[dict], bool]:
         """
         Processes feedbacks in chunks (Groq TPM limit = 25/chunk).
-        Uses Groq as primary per chunk, Gemini as fallback.
+        Uses Groq as primary per chunk, falls back to OpenRouter then Gemini.
         Merges results and re-sequences IDs globally.
+        Returns (items, corrections, used_fallback) — True if any chunk used a fallback.
         """
         all_items: list[dict] = []
         all_corrections: list[dict] = []
         global_offset = 0
+        any_fallback = False
 
         for i in range(0, len(feedbacks), chunk_size):
             chunk = feedbacks[i : i + chunk_size]
             prompt = self._build_categorization_prompt(chunk)
-            text = await self._call_llm_iris(prompt, n_feedbacks=len(chunk))
+            text, chunk_fallback = await self._call_llm_iris(prompt, n_feedbacks=len(chunk))
+            if chunk_fallback:
+                any_fallback = True
             data = self._parse_json_response(text)
             chunk_items = data.get("feedbacks", [])
             chunk_corrections = [
@@ -318,7 +322,7 @@ IMPORTANT RULES FOR CORRECTIONS:
             all_corrections.extend(chunk_corrections)
             global_offset += len(chunk)
 
-        return all_items, all_corrections
+        return all_items, all_corrections, any_fallback
 
     async def _call_llm(self, prompt: str, n_feedbacks: int | None = None, max_tokens: int | None = None, _force_groq: bool = False) -> tuple[str, bool]:
         """
@@ -410,11 +414,10 @@ IMPORTANT RULES FOR CORRECTIONS:
     ) -> tuple[list[dict], list[dict], bool]:
         """
         Categorizes feedbacks AND self-corrects.
-        Iris always uses Groq/Llama 3.3 70B (chunked) as primary model.
-        Returns (final_items, corrections_list, used_fallback=False — Groq is intentional).
+        Returns (final_items, corrections_list, used_fallback) — True if any chunk fell back from Groq.
         """
-        items, corrections = await self._categorize_chunked(feedbacks, GROQ_CHUNK_SIZE)
-        return items, corrections, False
+        items, corrections, used_fallback = await self._categorize_chunked(feedbacks, GROQ_CHUNK_SIZE)
+        return items, corrections, used_fallback
 
     # ------------------------------------------------------------------
     # Step 2: Executive report
