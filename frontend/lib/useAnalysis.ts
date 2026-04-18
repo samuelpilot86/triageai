@@ -109,6 +109,7 @@ export function useAnalysis() {
   const usedFallbackRef = useRef<boolean>(false);
   const reportRef = useRef<{ text: string; fallback: boolean } | null>(null);
   const userStoryCardsRef = useRef<UserStoryCard[]>([]);
+  const nonActionableItemsRef = useRef<string[]>([]);
   const categorizationStartRef = useRef<number | null>(null);
   const reportStartRef = useRef<number | null>(null);
   const nFeedbacksRef = useRef<number>(0);
@@ -122,6 +123,7 @@ export function useAnalysis() {
     usedFallbackRef.current = false;
     reportRef.current = null;
     userStoryCardsRef.current = [];
+    nonActionableItemsRef.current = [];
     categorizationStartRef.current = null;
     reportStartRef.current = null;
     nFeedbacksRef.current = 0;
@@ -134,6 +136,7 @@ export function useAnalysis() {
     report: reportRef.current?.text ?? "",
     report_fallback: reportRef.current?.fallback ?? false,
     user_story_cards: userStoryCardsRef.current,
+    non_actionable_items: nonActionableItemsRef.current,
   }), []);
 
   const handleEvents = useCallback((event: string, data: unknown) => {
@@ -141,6 +144,7 @@ export function useAnalysis() {
     if (event === "status") {
       const s = d.step as string;
       if (s === "scraping") setStep({ type: "scraping" });
+      else if (s === "sift") setStep({ type: "sift", startedAt: Date.now(), estimatedMs: 5000 });
       else if (s === "report") {
         // Set step immediately so Penn card activates without waiting for the fetch
         const startedAt = Date.now();
@@ -162,12 +166,18 @@ export function useAnalysis() {
         const startedAt = Date.now();
         setStep({ type: "clustering", startedAt, estimatedMs: 8_000 });
       }
+    } else if (event === "sifted") {
+      nonActionableItemsRef.current = (d.non_actionable as string[]) ?? [];
+      nFeedbacksRef.current = d.actionable_count as number;
     } else if (event === "scraped") {
       setStep((prev) =>
         prev.type === "categorization" ? prev : { type: "categorization" }
       );
     } else if (event === "clustered") {
       setStep({ type: "clustering", clusterCount: d.count as number });
+      if (Array.isArray(d.items) && d.items.length > 0) {
+        setPartialItems(d.items as FeedbackItem[]);
+      }
     } else if (event === "categorization") {
       const fallback = (d.used_fallback as boolean) ?? false;
       setPartialItems(d.items as FeedbackItem[]);
@@ -185,10 +195,6 @@ export function useAnalysis() {
         text: d.text as string,
         fallback: d.used_fallback as boolean,
       };
-      // Update items with cluster info if present
-      if (Array.isArray(d.items) && d.items.length > 0) {
-        setPartialItems(d.items as FeedbackItem[]);
-      }
       setPartialItems((items) => {
         setStep({ type: "done", result: buildResult(items) });
         return items;
@@ -292,5 +298,5 @@ export function useAnalysis() {
     if (lastCallRef.current) return lastCallRef.current();
   }, []);
 
-  return { step, partialItems, appName, analyzeText, analyzeCsv, analyzeStore, reset, retry };
+  return { step, partialItems, appName, nonActionableItemsRef, analyzeText, analyzeCsv, analyzeStore, reset, retry };
 }

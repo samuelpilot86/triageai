@@ -27,6 +27,13 @@ const AGENTS: AgentDef[] = [
     storeOnly: true,
   },
   {
+    id: "sift",
+    name: "Sift",
+    role: "Pre-filter",
+    emoji: "🪣",
+    model: "Gemini 2.5 Flash Lite",
+  },
+  {
     id: "categorization",
     name: "Iris",
     role: "Categorizer",
@@ -38,7 +45,7 @@ const AGENTS: AgentDef[] = [
     name: "Echo",
     role: "Cluster Analyst",
     emoji: "🗂️",
-    model: "sentence-transformers",
+    model: "Gemini 2.5 Flash Lite",
   },
   {
     id: "report",
@@ -71,12 +78,14 @@ function deriveStatuses(
   isScraping: boolean
 ): Record<string, AgentStatus> {
   const order = isScraping
-    ? ["scraping", "categorization", "clustering", "report", "stella"]
-    : ["categorization", "clustering", "report", "stella"];
+    ? ["scraping", "sift", "categorization", "clustering", "report", "stella"]
+    : ["sift", "categorization", "clustering", "report", "stella"];
 
   const activeId =
     step.type === "scraping"
       ? "scraping"
+      : step.type === "sift"
+      ? "sift"
       : step.type === "categorization"
       ? "categorization"
       : step.type === "clustering"
@@ -169,7 +178,9 @@ function IrisProgressBar({
 // ------------------------------------------------------------------
 
 const FALLBACK_CHAINS: Record<string, string> = {
+  sift: "Gemini 2.5 Flash Lite → Mistral Small → OpenRouter · Nemotron 120B → Groq · Llama 3.3 70B",
   categorization: "Groq · Llama 3.3 70B → OpenRouter · Nemotron 120B → Gemini 2.5 Flash Lite",
+  clustering: "Gemini 2.5 Flash Lite → Mistral Small → OpenRouter · Nemotron 120B → Groq · Llama 3.3 70B",
   report: "Gemini 2.5 Flash Lite → Mistral Small → OpenRouter · Nemotron 120B → Groq · Llama 3.3 70B",
   stella: "Gemini 2.5 Flash Lite → Mistral Small → OpenRouter · Nemotron 120B → Groq · Llama 3.3 70B",
 };
@@ -249,6 +260,9 @@ function AgentCard({
       )}
 
       {/* Progress bars */}
+      {isActive && agent.id === "sift" && step.type === "sift" && (
+        <IrisProgressBar startedAt={step.startedAt} estimatedMs={step.estimatedMs} />
+      )}
       {isActive && agent.id === "categorization" && step.type === "categorization" && (
         <IrisProgressBar startedAt={step.startedAt} estimatedMs={step.estimatedMs} />
       )}
@@ -285,15 +299,19 @@ export default function AgentPipeline({
   scrapedCount,
   nFeedbacks,
   clusterCount,
+  siftedCount,
   irisFallback,
   reportFallback,
+  siftFallback,
 }: {
   step: AnalysisStep;
   scrapedCount?: number;
   nFeedbacks?: number;
   clusterCount?: number;
+  siftedCount?: number;
   irisFallback?: boolean;
   reportFallback?: boolean;
+  siftFallback?: boolean;
 }) {
   // isScraping is true as soon as scrapedCount is set (persisted by pipelineMetaRef in page.tsx),
   // OR while the scraping step is active — so Webb stays visible through the entire analysis.
@@ -305,6 +323,9 @@ export default function AgentPipeline({
   if (scrapedCount !== undefined) {
     stats["scraping"] = { label: `${scrapedCount} reviews fetched` };
   }
+  if (siftedCount !== undefined && statuses["sift"] === "done") {
+    stats["sift"] = { label: `${siftedCount} actionable` };
+  }
   if (nFeedbacks !== undefined && statuses["categorization"] === "done") {
     stats["categorization"] = { label: `${nFeedbacks} feedbacks categorized` };
   }
@@ -313,6 +334,7 @@ export default function AgentPipeline({
   }
 
   const fallbacks: Record<string, boolean> = {
+    sift: siftFallback ?? false,
     categorization: irisFallback ?? false,
     report: reportFallback ?? false,
     stella: reportFallback ?? false,
