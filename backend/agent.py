@@ -260,14 +260,14 @@ IMPORTANT RULES FOR CORRECTIONS:
             try:
                 response = await _asyncio.wait_for(
                     self.openrouter_client.chat.completions.create(
-                        model="nvidia/nemotron-3-super-120b-a12b:free",
+                        model="openrouter/auto",
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.2,
                         max_tokens=nemotron_max_tokens,
                     ),
-                    timeout=45,
+                    timeout=90,
                 )
-                return _require_content(response, "OpenRouter/Nemotron"), True
+                return _require_content(response, "OpenRouter/auto"), True
             except Exception as e:
                 errors.append(f"OpenRouter: {type(e).__name__}: {e}")
 
@@ -400,14 +400,14 @@ IMPORTANT RULES FOR CORRECTIONS:
             try:
                 response = await _asyncio.wait_for(
                     self.openrouter_client.chat.completions.create(
-                        model="nvidia/nemotron-3-super-120b-a12b:free",
+                        model="openrouter/auto",
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.2,
                         max_tokens=nemotron_max_tokens,
                     ),
-                    timeout=60,
+                    timeout=90,
                 )
-                return _require_content(response, "OpenRouter/Nemotron"), True
+                return _require_content(response, "OpenRouter/auto"), True
             except Exception as e:
                 fallback_errors.append(f"OpenRouter: {type(e).__name__}: {e}")
 
