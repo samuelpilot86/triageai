@@ -150,11 +150,11 @@ function IrisProgressBar({
 // ------------------------------------------------------------------
 
 const FALLBACK_CHAINS: Record<string, string> = {
-  sift: "Gemini 2.5 Flash Lite → Mistral Small → OpenRouter · Nemotron 120B → Groq · Llama 3.3 70B",
-  categorization: "Groq · Llama 3.3 70B → OpenRouter · Nemotron 120B → Gemini 2.5 Flash Lite",
-  clustering: "Gemini 2.5 Flash Lite → Mistral Small → OpenRouter · Nemotron 120B → Groq · Llama 3.3 70B",
-  report: "Gemini 2.5 Flash Lite → Mistral Small → OpenRouter · Nemotron 120B → Groq · Llama 3.3 70B",
-  stella: "Gemini 2.5 Flash Lite → Mistral Small → OpenRouter · Nemotron 120B → Groq · Llama 3.3 70B",
+  sift: "Gemini 2.5 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
+  categorization: "Groq · Llama 3.3 70B → OpenRouter · auto → Gemini 2.5 Flash Lite",
+  clustering: "Gemini 2.5 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
+  report: "Gemini 2.5 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
+  stella: "Gemini 2.5 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
 };
 
 function AgentCard({
