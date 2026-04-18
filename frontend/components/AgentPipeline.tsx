@@ -19,14 +19,6 @@ interface AgentDef {
 
 const AGENTS: AgentDef[] = [
   {
-    id: "scraping",
-    name: "Webb",
-    role: "Web Scraper",
-    emoji: "🕸️",
-    model: null,
-    storeOnly: true,
-  },
-  {
     id: "sift",
     name: "Sift",
     role: "Pre-filter",
@@ -73,37 +65,20 @@ interface AgentStat {
   label: string;
 }
 
-function deriveStatuses(
-  step: AnalysisStep,
-  isScraping: boolean
-): Record<string, AgentStatus> {
-  const order = isScraping
-    ? ["scraping", "sift", "categorization", "clustering", "report", "stella"]
-    : ["sift", "categorization", "clustering", "report", "stella"];
+function deriveStatuses(step: AnalysisStep): Record<string, AgentStatus> {
+  const order = ["sift", "categorization", "clustering", "report", "stella"];
 
   const activeId =
-    step.type === "scraping"
-      ? "scraping"
-      : step.type === "sift"
-      ? "sift"
-      : step.type === "categorization"
-      ? "categorization"
-      : step.type === "clustering"
-      ? "clustering"
-      : step.type === "report"
-      ? "report"
-      : step.type === "done"
-      ? null
-      : null;
+    step.type === "sift" ? "sift"
+    : step.type === "categorization" ? "categorization"
+    : step.type === "clustering" ? "clustering"
+    : step.type === "report" ? "report"
+    : null;
 
   const statuses: Record<string, AgentStatus> = {};
   let foundActive = false;
 
   for (const id of order) {
-    if (!isScraping && id === "scraping") {
-      statuses[id] = "hidden";
-      continue;
-    }
     if (activeId === id) {
       statuses[id] = "active";
       foundActive = true;
@@ -114,11 +89,8 @@ function deriveStatuses(
     }
   }
 
-  // All done when step is "done"
   if (step.type === "done") {
-    for (const id of order) {
-      statuses[id] = "done";
-    }
+    for (const id of order) statuses[id] = "done";
   }
 
   return statuses;
@@ -296,7 +268,6 @@ function Arrow({ active }: { active: boolean }) {
 
 export default function AgentPipeline({
   step,
-  scrapedCount,
   nFeedbacks,
   clusterCount,
   siftedCount,
@@ -305,7 +276,6 @@ export default function AgentPipeline({
   siftFallback,
 }: {
   step: AnalysisStep;
-  scrapedCount?: number;
   nFeedbacks?: number;
   clusterCount?: number;
   siftedCount?: number;
@@ -313,16 +283,9 @@ export default function AgentPipeline({
   reportFallback?: boolean;
   siftFallback?: boolean;
 }) {
-  // isScraping is true as soon as scrapedCount is set (persisted by pipelineMetaRef in page.tsx),
-  // OR while the scraping step is active — so Webb stays visible through the entire analysis.
-  const isScraping = scrapedCount !== undefined || step.type === "scraping";
-
-  const statuses = deriveStatuses(step, isScraping);
+  const statuses = deriveStatuses(step);
 
   const stats: Record<string, AgentStat> = {};
-  if (scrapedCount !== undefined) {
-    stats["scraping"] = { label: `${scrapedCount} reviews fetched` };
-  }
   if (siftedCount !== undefined && statuses["sift"] === "done") {
     stats["sift"] = { label: `${siftedCount} actionable` };
   }

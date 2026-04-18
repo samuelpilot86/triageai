@@ -13,11 +13,10 @@ import { RotateCcw } from "lucide-react";
 export default function Home() {
   const { step, partialItems, appName, nonActionableItemsRef, analyzeText, analyzeCsv, analyzeStore, reset, retry } = useAnalysis();
   const resultsRef = useRef<HTMLDivElement>(null);
-  const pipelineMetaRef = useRef<{ scrapedCount?: number; nFeedbacks?: number; clusterCount?: number; siftedCount?: number }>({});
+  const pipelineMetaRef = useRef<{ nFeedbacks?: number; clusterCount?: number; siftedCount?: number }>({});
 
   // Persist pipeline metadata across step transitions
   if (step.type === "categorization") {
-    if (step.scrapedCount !== undefined) pipelineMetaRef.current.scrapedCount = step.scrapedCount;
     if (step.nFeedbacks !== undefined) {
       pipelineMetaRef.current.nFeedbacks = step.nFeedbacks;
       pipelineMetaRef.current.siftedCount = step.nFeedbacks;
@@ -86,7 +85,6 @@ export default function Home() {
             {/* Agent pipeline preview */}
             <div className="flex items-stretch gap-2">
               {[
-                { emoji: "🕸️", name: "Webb", role: "Web Scraper", model: "Python scraper", desc: "Pulls reviews from App Store & Google Play" },
                 { emoji: "🪣", name: "Sift", role: "Pre-filter", model: "Gemini 2.5 Flash Lite", desc: "Filters non-actionable feedback" },
                 { emoji: "🔬", name: "Iris", role: "Categorizer", model: "Groq · Llama 3.3 70B", desc: "Tags & prioritizes every feedback" },
                 { emoji: "🗂️", name: "Echo", role: "Cluster Analyst", model: "Gemini 2.5 Flash Lite", desc: "Groups feedbacks by semantic similarity" },
@@ -166,7 +164,6 @@ export default function Home() {
             <section className="py-4">
               <AgentPipeline
                 step={step}
-                scrapedCount={pipelineMetaRef.current.scrapedCount}
                 nFeedbacks={pipelineMetaRef.current.nFeedbacks}
                 clusterCount={pipelineMetaRef.current.clusterCount}
                 siftedCount={pipelineMetaRef.current.siftedCount}
