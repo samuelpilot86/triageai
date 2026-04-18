@@ -269,7 +269,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                 )
                 return _require_content(response, "OpenRouter/Nemotron"), True
             except Exception as e:
-                errors.append(f"OpenRouter: {e}")
+                errors.append(f"OpenRouter: {type(e).__name__}: {e}")
 
         # 3. Gemini — last resort, with retries on 503
         last_error: Exception | None = None
@@ -409,7 +409,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                 )
                 return _require_content(response, "OpenRouter/Nemotron"), True
             except Exception as e:
-                fallback_errors.append(f"OpenRouter: {e}")
+                fallback_errors.append(f"OpenRouter: {type(e).__name__}: {e}")
 
         # 4. Groq — last resort (may be TPD-exhausted if Iris already used it)
         if self.groq_client:
