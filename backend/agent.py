@@ -485,7 +485,7 @@ Return ONLY valid JSON array of integers, e.g.: [1, 3, 5]"""
 FEEDBACKS (id: summary):
 {id_summary_list}
 
-Return ONLY valid JSON array:
+YOUR RESPONSE MUST START WITH [ AND CONTAIN ONLY A VALID JSON ARRAY. No explanation, no preamble, no markdown.
 [
   {{
     "cluster_label": "short descriptive name (max 8 words)",
@@ -495,9 +495,12 @@ Return ONLY valid JSON array:
 
         text, _ = await self._call_llm(prompt, max_tokens=2000)
         try:
-            clean = re.sub(r"```(?:json)?\s*\n?", "", text)
+            # Strip <think> blocks, fences, then find the JSON array
+            clean = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+            clean = re.sub(r"```(?:json)?\s*\n?", "", clean)
             clean = re.sub(r"\n?```", "", clean).strip()
-            m = re.search(r'\[.*\]', clean, re.DOTALL)
+            # Find the first [ ... ] block (may have preamble text before it)
+            m = re.search(r'\[[\s\S]*\]', clean)
             raw_clusters = json.loads(m.group(0) if m else clean)
         except Exception as e:
             raise RuntimeError(f"cluster_with_llm: failed to parse LLM response: {e}\nRaw: {text[:300]}")
