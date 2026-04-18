@@ -29,7 +29,7 @@ TEST_FEEDBACKS = [
     "Onboarding is confusing, I had no idea how to create my first project.",
 ]
 
-EXPECTED_EVENTS = {"categorization", "clustered", "report", "done"}
+EXPECTED_EVENTS = {"sifted", "categorization", "clustered", "report", "done"}
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -99,6 +99,8 @@ def stream_analysis() -> list[tuple[str, dict]]:
 def _print_event(name: str, data: dict) -> None:
     if name == "status":
         print(f"  → [{name}] {data.get('step')}: {data.get('message', '')}")
+    elif name == "sifted":
+        print(f"  → [{name}] {data.get('actionable_count')} actionable, {data.get('non_actionable_count')} filtered")
     elif name == "categorization":
         n = len(data.get("items", []))
         fallback = data.get("used_fallback", False)
