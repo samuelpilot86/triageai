@@ -136,7 +136,7 @@ _TOKENS_OVERHEAD = 512
 # max safe feedbacks per call = floor((12000 - 1500) / 250) = 42.
 # Use 25 for a balance between safety margin and number of API calls.
 # 100 feedbacks → 4 chunks of 25 (vs 5 chunks of 20 before).
-GROQ_CHUNK_SIZE = 25
+GROQ_CHUNK_SIZE = 30
 
 
 class FeedbackTriageAgent:
@@ -189,10 +189,6 @@ For each feedback, determine:
   * Medium = significant friction but has a workaround
   * Low    = cosmetic improvement or edge case
 - priority_reason : justification in 10 words or fewer
-- actionable  : true if the feedback contains specific, identifiable product information
-                (a concrete bug, a precise feature request, a reproducible UX issue, etc.)
-                false if it is purely emotional, generic, or contains no actionable product signal
-                (e.g. "worst app ever", "I hate this", "dumbest ai" with no further detail)
 
 ═══ PHASE 2 — SELF-CORRECTION ═══
 Review your own decisions critically:
@@ -212,8 +208,7 @@ Return ONLY valid JSON, no markdown, no surrounding text:
       "summary": "...",
       "category": "...",
       "priority": "...",
-      "priority_reason": "...",
-      "actionable": true
+      "priority_reason": "..."
     }}
   ],
   "corrections": [
@@ -235,39 +230,40 @@ IMPORTANT RULES FOR CORRECTIONS:
 
     async def _call_llm_iris(self, prompt: str, n_feedbacks: int | None = None) -> tuple[str, bool]:
         """
-        Iris call chain: Groq → OpenRouter → Gemini.
+        Iris call chain: Groq → OpenRouter/Nemotron → Gemini.
         Returns (text, used_fallback) where used_fallback=True if Groq was unavailable.
         """
         import asyncio as _asyncio
 
         n = n_feedbacks or 25
-        max_tokens = min(FALLBACK_MODEL_MAX_TOKENS, _TOKENS_OVERHEAD + n * _TOKENS_PER_FEEDBACK)
+        # Groq hard limit: 32 768 tokens. Output budget: 250 tokens/feedback + 512 overhead.
+        groq_max_tokens = min(FALLBACK_MODEL_MAX_TOKENS, _TOKENS_OVERHEAD + n * _TOKENS_PER_FEEDBACK)
+        # Nemotron free tier: empirically capped around 4096 output tokens.
+        nemotron_max_tokens = min(4096, groq_max_tokens)
         errors: list[str] = []
 
-        # 1. Groq
+        # 1. Groq (llama-3.3-70b-versatile) — fastest, structured JSON
         if self.groq_client:
             try:
                 response = await self.groq_client.chat.completions.create(
                     model=FALLBACK_MODEL,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.2,
-                    max_tokens=max_tokens,
+                    max_tokens=groq_max_tokens,
                 )
                 return _require_content(response, "Groq"), False
             except Exception as e:
                 errors.append(f"Groq: {e}")
 
-        # 2. OpenRouter (NVIDIA Nemotron 3 Super 120B — infra NVIDIA, independent of Google/Groq)
-        # Cap at 4096 tokens: free tier has tighter output limits; timeout at 45s per chunk.
+        # 2. OpenRouter Nemotron 120B — NVIDIA infra, independent quota. 45s timeout.
         if self.openrouter_client:
             try:
-                import asyncio as _asyncio
                 response = await _asyncio.wait_for(
                     self.openrouter_client.chat.completions.create(
                         model="nvidia/nemotron-3-super-120b-a12b:free",
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.2,
-                        max_tokens=min(max_tokens, 4096),
+                        max_tokens=nemotron_max_tokens,
                     ),
                     timeout=45,
                 )
@@ -340,12 +336,11 @@ IMPORTANT RULES FOR CORRECTIONS:
 
         return all_items, all_corrections, any_fallback
 
-    async def _call_llm(self, prompt: str, n_feedbacks: int | None = None, max_tokens: int | None = None, _force_groq: bool = False) -> tuple[str, bool]:
+    async def _call_llm(self, prompt: str, max_tokens: int = 2500) -> tuple[str, bool]:
         """
-        Calls the primary model (Gemini) with up to 2 retries on transient errors
-        (503 UNAVAILABLE, high demand), then falls back to Groq on quota/persistent errors.
-        Returns (response_text, used_fallback).
-        Raises if both models fail or Groq is not configured.
+        Penn/Nova call chain: Gemini → Mistral → OpenRouter/Nemotron → Groq.
+        Returns (response_text, used_fallback). used_fallback=True if Gemini was unavailable.
+        max_tokens: explicit budget (2500 for report, 3000 for user stories).
         """
         import asyncio as _asyncio
 
@@ -355,42 +350,37 @@ IMPORTANT RULES FOR CORRECTIONS:
         def _is_quota(error_str: str) -> bool:
             return "429" in error_str or "RESOURCE_EXHAUSTED" in error_str
 
-        # Try Gemini first (unless forced to Groq for chunked calls)
-        if not _force_groq:
-            last_error = None
-            for attempt in range(3):  # 1 initial + 2 retries
-                try:
-                    response = await self.client.aio.models.generate_content(
-                        model=PRIMARY_MODEL,
-                        contents=prompt,
-                    )
-                    return self._extract_text(response), False
+        gemini_error = "skipped"
+        fallback_errors: list[str] = []
 
-                except Exception as e:
-                    error_str = str(e)
-                    last_error = e
+        # 1. Gemini 2.5 Flash Lite — best quality for narrative synthesis, generous free tier
+        last_error = None
+        for attempt in range(3):
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=PRIMARY_MODEL,
+                    contents=prompt,
+                )
+                return self._extract_text(response), False
+            except Exception as e:
+                error_str = str(e)
+                last_error = e
+                if _is_retryable(error_str) and attempt < 2:
+                    await _asyncio.sleep(2 ** attempt)
+                    continue
+                elif _is_quota(error_str) or _is_retryable(error_str):
+                    break
+                else:
+                    raise
+        gemini_error = str(last_error)[:100] if last_error else "unknown"
+        fallback_errors.append(f"Gemini: {gemini_error}")
 
-                    if _is_retryable(error_str) and attempt < 2:
-                        # Transient overload — wait and retry
-                        await _asyncio.sleep(2 ** attempt)  # 1s, 2s
-                        continue
-                    elif _is_quota(error_str) or _is_retryable(error_str):
-                        # Quota exhausted or still failing after retries — go to Groq
-                        break
-                    else:
-                        raise  # Unexpected error: propagate immediately
+        # Groq hard limit applies here too
+        groq_max_tokens = min(FALLBACK_MODEL_MAX_TOKENS, max_tokens)
+        # Nemotron free tier cap
+        nemotron_max_tokens = min(4096, max_tokens)
 
-            # All Gemini attempts failed with quota/overload
-            _ = last_error  # suppress unused warning
-
-        if max_tokens is None:
-            n = n_feedbacks or 50
-            max_tokens = min(FALLBACK_MODEL_MAX_TOKENS, _TOKENS_OVERHEAD + n * _TOKENS_PER_FEEDBACK)
-
-        gemini_error = str(last_error) if 'last_error' in dir() else "unknown"  # type: ignore[name-defined]
-        fallback_errors: list[str] = [f"Gemini: {gemini_error[:100]}"]
-
-        # 2. Mistral Small
+        # 2. Mistral Small — good for structured reports, separate quota
         if self.mistral_client:
             try:
                 response = await self.mistral_client.chat.complete_async(
@@ -403,29 +393,32 @@ IMPORTANT RULES FOR CORRECTIONS:
             except Exception as e:
                 fallback_errors.append(f"Mistral: {e}")
         else:
-            fallback_errors.append("Mistral: not configured (MISTRAL_API_KEY missing?)")
+            fallback_errors.append("Mistral: not configured")
 
-        # 3. OpenRouter (Nemotron 120B — NVIDIA infra, independent of Google/Groq)
+        # 3. OpenRouter Nemotron 120B — NVIDIA infra, 45s timeout
         if self.openrouter_client:
             try:
-                response = await self.openrouter_client.chat.completions.create(
-                    model="nvidia/nemotron-3-super-120b-a12b:free",
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.2,
-                    max_tokens=max_tokens,
+                response = await _asyncio.wait_for(
+                    self.openrouter_client.chat.completions.create(
+                        model="nvidia/nemotron-3-super-120b-a12b:free",
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.2,
+                        max_tokens=nemotron_max_tokens,
+                    ),
+                    timeout=60,
                 )
                 return _require_content(response, "OpenRouter/Nemotron"), True
             except Exception as e:
                 fallback_errors.append(f"OpenRouter: {e}")
 
-        # 4. Groq
+        # 4. Groq — last resort (may be TPD-exhausted if Iris already used it)
         if self.groq_client:
             try:
                 response = await self.groq_client.chat.completions.create(
                     model=FALLBACK_MODEL,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.2,
-                    max_tokens=max_tokens,
+                    max_tokens=groq_max_tokens,
                 )
                 return _require_content(response, "Groq"), True
             except Exception as e:
@@ -435,6 +428,123 @@ IMPORTANT RULES FOR CORRECTIONS:
             "All Penn/Nova models exhausted (Gemini → Mistral → OpenRouter → Groq). "
             "Try again in a few minutes. Details: " + " | ".join(fallback_errors)
         )
+
+    # ------------------------------------------------------------------
+    # Sift — filter actionable feedbacks (single batched LLM call)
+    # ------------------------------------------------------------------
+
+    async def sift_feedbacks(self, feedbacks: list[str]) -> tuple[list[str], list[str]]:
+        """
+        Filters feedbacks into actionable and non-actionable.
+        Uses _call_llm (Gemini → Mistral → OpenRouter → Groq).
+        Returns (actionable_texts, non_actionable_texts).
+        """
+        numbered = "\n".join(f"{i + 1}. {f}" for i, f in enumerate(feedbacks))
+        prompt = f"""You are filtering product feedback for a PM. Return ONLY a JSON array of IDs (integers) for feedbacks that are actionable — meaning they contain a specific bug, feature request, UX issue, or reproducible problem. Exclude: generic praise ("great app"), gibberish, off-topic content, or vague emotional reactions with no product signal.
+
+FEEDBACKS:
+{numbered}
+
+Return ONLY valid JSON array of integers, e.g.: [1, 3, 5]"""
+
+        text, _ = await self._call_llm(prompt, max_tokens=1000)
+        # Parse the JSON array
+        try:
+            clean = re.sub(r"```(?:json)?\s*\n?", "", text)
+            clean = re.sub(r"\n?```", "", clean).strip()
+            # Extract array from possible surrounding text
+            m = re.search(r'\[[\d,\s]*\]', clean)
+            if m:
+                actionable_ids = set(json.loads(m.group(0)))
+            else:
+                actionable_ids = set(json.loads(clean))
+        except Exception:
+            # On parse failure, treat all as actionable
+            import logging as _logging
+            _logging.getLogger("triage").warning("sift_feedbacks: failed to parse LLM response, treating all as actionable. Raw: %s", text[:300])
+            return feedbacks, []
+
+        actionable = [f for i, f in enumerate(feedbacks, 1) if i in actionable_ids]
+        non_actionable = [f for i, f in enumerate(feedbacks, 1) if i not in actionable_ids]
+        return actionable, non_actionable
+
+    # ------------------------------------------------------------------
+    # Echo — LLM-based clustering
+    # ------------------------------------------------------------------
+
+    async def cluster_with_llm(self, items: list[dict]) -> list[dict]:
+        """
+        Clusters feedback items using a single LLM call on their summaries.
+        Returns clusters sorted by priority score desc (High=3, Medium=1, Low=0).
+        Each cluster dict: {score, cluster_label, category, items}.
+        Tags each item with cluster_id and cluster_label.
+        """
+        id_summary_list = "\n".join(f"{it['id']}: {it.get('summary', '')}" for it in items)
+        prompt = f"""You are a product analyst. Group these feedback summaries into thematic clusters. Each cluster must correspond to a single Jira ticket: one specific behavior, one probable root cause, one testable "done" definition. If two feedbacks describe different behaviors (even under the same general theme), put them in separate clusters. Decide the number of clusters yourself based on the data.
+
+FEEDBACKS (id: summary):
+{id_summary_list}
+
+Return ONLY valid JSON array:
+[
+  {{
+    "cluster_label": "short descriptive name (max 8 words)",
+    "ids": [1, 3, 7]
+  }}
+]"""
+
+        text, _ = await self._call_llm(prompt, max_tokens=2000)
+        try:
+            clean = re.sub(r"```(?:json)?\s*\n?", "", text)
+            clean = re.sub(r"\n?```", "", clean).strip()
+            m = re.search(r'\[.*\]', clean, re.DOTALL)
+            raw_clusters = json.loads(m.group(0) if m else clean)
+        except Exception as e:
+            raise RuntimeError(f"cluster_with_llm: failed to parse LLM response: {e}\nRaw: {text[:300]}")
+
+        # Build id → item lookup
+        item_by_id: dict[int, dict] = {it["id"]: it for it in items}
+
+        result = []
+        assigned_ids: set[int] = set()
+        for raw in raw_clusters:
+            cluster_ids = [i for i in raw.get("ids", []) if i in item_by_id]
+            if not cluster_ids:
+                continue
+            cluster_items = [item_by_id[i] for i in cluster_ids]
+            assigned_ids.update(cluster_ids)
+            score = sum(_PRIORITY_SCORE.get(it.get("priority", "Low"), 0) for it in cluster_items)
+            cats = [it.get("category", "") for it in cluster_items]
+            majority_cat = max(set(cats), key=cats.count)
+            result.append({
+                "score": score,
+                "cluster_label": raw.get("cluster_label", "Uncategorized"),
+                "category": majority_cat,
+                "items": cluster_items,
+            })
+
+        # Any items not assigned by LLM go to an "Other" cluster
+        unassigned = [it for it in items if it["id"] not in assigned_ids]
+        if unassigned:
+            score = sum(_PRIORITY_SCORE.get(it.get("priority", "Low"), 0) for it in unassigned)
+            cats = [it.get("category", "") for it in unassigned]
+            majority_cat = max(set(cats), key=cats.count) if cats else "Other"
+            result.append({
+                "score": score,
+                "cluster_label": "Other",
+                "category": majority_cat,
+                "items": unassigned,
+            })
+
+        result.sort(key=lambda x: x["score"], reverse=True)
+
+        # Tag each item with cluster_id and cluster_label
+        for cluster_id, cluster in enumerate(result):
+            for item in cluster["items"]:
+                item["cluster_id"] = cluster_id
+                item["cluster_label"] = cluster["cluster_label"]
+
+        return result
 
     # ------------------------------------------------------------------
     # Step 1: Categorization + Self-validation (single LLM call)
@@ -467,10 +577,10 @@ IMPORTANT RULES FOR CORRECTIONS:
         clusters_for_prompt = []
         for c in clusters[:6]:
             high_med = [it for it in c["items"] if it.get("priority") in ("High", "Medium")]
-            verbatims = [it["original"][:200] for it in high_med[:3]]
+            verbatims = [it["original"][:200] for it in high_med]
             clusters_for_prompt.append({
                 "priority_score": c["score"],
-                "representative_summary": c["representative_summary"],
+                "cluster_label": c.get("cluster_label", c.get("representative_summary", "")),
                 "category": c["category"],
                 "total_feedbacks": len(c["items"]),
                 "high": sum(1 for it in c["items"] if it.get("priority") == "High"),
@@ -493,8 +603,8 @@ ISSUE CLUSTERS (semantically grouped, sorted by priority score — High=3pts, Me
 
 Each cluster includes:
 - priority_score: sum of priority weights across all feedbacks in the cluster
-- representative_summary: the most central feedback summary in the cluster
-- verbatims: 1–3 real user quotes (original language) from High/Medium feedbacks in this cluster
+- cluster_label: short descriptive name for the cluster
+- verbatims: real user quotes (original language) from High/Medium feedbacks in this cluster
 
 Return ONLY valid JSON (no markdown, no surrounding text) with this exact structure:
 {{

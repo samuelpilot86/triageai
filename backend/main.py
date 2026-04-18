@@ -112,61 +112,51 @@ def sse_event(event: str, data: dict) -> str:
 async def analysis_stream(feedbacks: list[str], app_name: str | None = None) -> AsyncGenerator[str, None]:
     agent = get_agent()
 
-    yield sse_event("status", {"step": "categorization", "message": f"Analyzing {len(feedbacks)} feedbacks…"})
-
+    # 1. Sift
+    yield sse_event("status", {"step": "sift", "message": f"Filtering {len(feedbacks)} feedbacks…"})
     try:
-        items, corrections, used_fallback = await agent.categorize_and_validate(feedbacks)
+        actionable_texts, non_actionable_texts = await agent.sift_feedbacks(feedbacks)
     except Exception as e:
         yield sse_event("error", {"message": str(e)})
         return
+    yield sse_event("sifted", {"actionable_count": len(actionable_texts), "non_actionable_count": len(non_actionable_texts), "non_actionable": non_actionable_texts})
 
-    yield sse_event("categorization", {
-        "items": items,
-        "corrections": corrections,
-        "used_fallback": used_fallback,
-    })
-
-    # ------------------------------------------------------------------
-    # Echo — semantic clustering
-    # ------------------------------------------------------------------
-    yield sse_event("status", {"step": "clustering", "message": "Grouping feedbacks by topic…"})
-
-    from agent import _cluster_items
+    # 2. Iris — only on actionable
+    yield sse_event("status", {"step": "categorization", "message": f"Analyzing {len(actionable_texts)} feedbacks…"})
     try:
-        clusters = await asyncio.get_event_loop().run_in_executor(None, lambda: _cluster_items(items))
+        items, corrections, used_fallback = await agent.categorize_and_validate(actionable_texts)
+    except Exception as e:
+        yield sse_event("error", {"message": str(e)})
+        return
+    yield sse_event("categorization", {"items": items, "corrections": corrections, "used_fallback": used_fallback})
+
+    # 3. Echo — LLM clustering
+    yield sse_event("status", {"step": "clustering", "message": "Grouping feedbacks by topic…"})
+    try:
+        clusters = await agent.cluster_with_llm(items)
     except Exception as e:
         yield sse_event("error", {"message": f"Clustering failed: {e}"})
         return
+    # Items now have cluster_id and cluster_label — emit items immediately
+    yield sse_event("clustered", {"count": len(clusters), "items": items})
 
-    yield sse_event("clustered", {"count": len(clusters)})
-
-    # ------------------------------------------------------------------
-    # Penn — executive report
-    # ------------------------------------------------------------------
+    # 4. Penn
     yield sse_event("status", {"step": "report", "message": "Generating executive report…"})
-
     try:
         report, actions, report_fallback = await agent.generate_report(items, clusters, app_name=app_name)
     except Exception as e:
         yield sse_event("error", {"message": str(e)})
         return
+    yield sse_event("report", {"text": report, "used_fallback": report_fallback})
 
-    yield sse_event("report", {
-        "text": report,
-        "used_fallback": report_fallback,
-        "items": items,
-    })
-
+    # 5. Nova
     if actions:
         yield sse_event("status", {"step": "report", "message": "Generating user story cards…"})
         try:
             cards, cards_fallback = await agent.generate_user_stories(clusters, actions)
-            yield sse_event("user_stories", {
-                "cards": cards,
-                "used_fallback": cards_fallback,
-            })
+            yield sse_event("user_stories", {"cards": cards, "used_fallback": cards_fallback})
         except Exception:
-            pass  # user stories are non-blocking — report is already shown
+            pass
 
     yield sse_event("done", {})
 

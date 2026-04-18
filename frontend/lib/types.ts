@@ -3,10 +3,10 @@ export type Store = "googleplay" | "appstore";
 export interface FeedbackItem {
   id: number;
   original: string;
-  summary: string;
-  category: string;
-  priority: "High" | "Medium" | "Low";
-  priority_reason: string;
+  summary?: string;
+  category?: string;
+  priority?: "High" | "Medium" | "Low";
+  priority_reason?: string;
   cluster_id?: number;
   cluster_label?: string;
   actionable?: boolean;
@@ -60,11 +60,13 @@ export interface AnalysisResult {
   report: string;
   report_fallback: boolean;
   user_story_cards: UserStoryCard[];
+  non_actionable_items?: string[];
 }
 
 export type AnalysisStep =
   | { type: "idle" }
   | { type: "scraping" }
+  | { type: "sift"; estimatedMs?: number; startedAt?: number }
   | { type: "categorization"; estimatedMs?: number; startedAt?: number; nFeedbacks?: number; scrapedCount?: number; usedFallback?: boolean }
   | { type: "clustering"; clusterCount?: number; estimatedMs?: number; startedAt?: number }
   | { type: "report"; estimatedMs?: number; startedAt?: number }

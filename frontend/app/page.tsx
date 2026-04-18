@@ -11,21 +11,24 @@ import { useAnalysis } from "@/lib/useAnalysis";
 import { RotateCcw } from "lucide-react";
 
 export default function Home() {
-  const { step, partialItems, appName, analyzeText, analyzeCsv, analyzeStore, reset, retry } = useAnalysis();
+  const { step, partialItems, appName, nonActionableItemsRef, analyzeText, analyzeCsv, analyzeStore, reset, retry } = useAnalysis();
   const resultsRef = useRef<HTMLDivElement>(null);
-  const pipelineMetaRef = useRef<{ scrapedCount?: number; nFeedbacks?: number; clusterCount?: number }>({});
+  const pipelineMetaRef = useRef<{ scrapedCount?: number; nFeedbacks?: number; clusterCount?: number; siftedCount?: number }>({});
 
   // Persist pipeline metadata across step transitions
   if (step.type === "categorization") {
     if (step.scrapedCount !== undefined) pipelineMetaRef.current.scrapedCount = step.scrapedCount;
-    if (step.nFeedbacks !== undefined) pipelineMetaRef.current.nFeedbacks = step.nFeedbacks;
+    if (step.nFeedbacks !== undefined) {
+      pipelineMetaRef.current.nFeedbacks = step.nFeedbacks;
+      pipelineMetaRef.current.siftedCount = step.nFeedbacks;
+    }
   }
   if (step.type === "clustering") {
     if (step.clusterCount !== undefined) pipelineMetaRef.current.clusterCount = step.clusterCount;
   }
 
   const isRunning = step.type !== "idle" && step.type !== "done" && step.type !== "error";
-  const showResults = partialItems.length > 0 || step.type === "categorization" || step.type === "done" || step.type === "error";
+  const showResults = partialItems.length > 0 || step.type === "sift" || step.type === "categorization" || step.type === "done" || step.type === "error";
   const skeletonCount = step.type === "categorization" && partialItems.length === 0
     ? Math.min(step.nFeedbacks ?? 10, 10)
     : 0;
@@ -84,8 +87,9 @@ export default function Home() {
             <div className="flex items-stretch gap-2">
               {[
                 { emoji: "🕸️", name: "Webb", role: "Web Scraper", model: "Python scraper", desc: "Pulls reviews from App Store & Google Play" },
+                { emoji: "🪣", name: "Sift", role: "Pre-filter", model: "Gemini 2.5 Flash Lite", desc: "Filters non-actionable feedback" },
                 { emoji: "🔬", name: "Iris", role: "Categorizer", model: "Groq · Llama 3.3 70B", desc: "Tags & prioritizes every feedback" },
-                { emoji: "🗂️", name: "Echo", role: "Cluster Analyst", model: "sentence-transformers", desc: "Groups feedbacks by semantic similarity" },
+                { emoji: "🗂️", name: "Echo", role: "Cluster Analyst", model: "Gemini 2.5 Flash Lite", desc: "Groups feedbacks by semantic similarity" },
                 { emoji: "🖊️", name: "Penn", role: "Reporter", model: "Gemini 2.5 Flash", desc: "Writes the executive summary" },
                 { emoji: "✨", name: "Nova", role: "Backlog Builder", model: "Gemini 2.5 Flash", desc: "Generates sprint cards with RICE scoring" },
               ].map((a, i, arr) => (
@@ -165,6 +169,7 @@ export default function Home() {
                 scrapedCount={pipelineMetaRef.current.scrapedCount}
                 nFeedbacks={pipelineMetaRef.current.nFeedbacks}
                 clusterCount={pipelineMetaRef.current.clusterCount}
+                siftedCount={pipelineMetaRef.current.siftedCount}
                 irisFallback={
                   step.type === "done" ? step.result.used_fallback :
                   step.type === "categorization" ? step.usedFallback :
@@ -202,16 +207,20 @@ export default function Home() {
             </>
           )}
 
-          {/* 4 — Qualified feedbacks */}
-          {showResults && (partialItems.length > 0 || skeletonCount > 0) && (
+          {/* 4 — Actionable feedbacks */}
+          {showResults && (partialItems.length > 0 || skeletonCount > 0 || (step.type === "done" && (step.result.non_actionable_items?.length ?? 0) > 0)) && (
             <section className="space-y-2">
               <h2 className="text-sm font-medium text-gray-500">
-                Qualified feedbacks
+                Actionable feedbacks
                 {isRunning && step.type === "report" && (
                   <span className="ml-2 text-xs text-indigo-500 animate-pulse">Generating report…</span>
                 )}
               </h2>
-              <FeedbackTable items={partialItems} skeletonCount={skeletonCount} />
+              <FeedbackTable
+                items={partialItems}
+                skeletonCount={skeletonCount}
+                nonActionableItems={step.type === "done" ? (step.result.non_actionable_items ?? []) : nonActionableItemsRef.current}
+              />
             </section>
           )}
 
