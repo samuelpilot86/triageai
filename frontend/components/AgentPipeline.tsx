@@ -50,7 +50,7 @@ const AGENTS: AgentDef[] = [
     id: "stella",
     name: "Nova",
     role: "Story Writer",
-    emoji: "✨",
+    emoji: "🃏",
     model: "Gemini 2.5 Flash",
   },
 ];

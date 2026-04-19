@@ -44,7 +44,7 @@ const AGENTS = [
     modelClass: "gemini",
   },
   {
-    emoji: "✨",
+    emoji: "🃏",
     name: "Nova",
     role: "Backlog Builder",
     model: "Gemini 2.5 Flash",
