@@ -12,26 +12,38 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7860";
 const FALLBACK_MS_PER_FEEDBACK = 200;
 const FALLBACK_REPORT_MS = 15_000;
 
-async function fetchTimingEstimate(step: "categorization" | "report", n?: number): Promise<number> {
+type TimingStep = "sift" | "categorization" | "clustering" | "report" | "stella";
+
+const FALLBACK_MS: Record<TimingStep, number> = {
+  sift: 8_000,
+  categorization: 15_000,
+  clustering: 8_000,
+  report: 15_000,
+  stella: 10_000,
+};
+
+async function fetchTimingEstimate(step: TimingStep, n?: number): Promise<number> {
   try {
     const res = await fetch(`${API_BASE}/api/timings?step=${step}`);
     if (!res.ok) throw new Error();
     const { timings } = await res.json() as { timings: { ms: number; n?: number }[] };
     if (!timings.length) throw new Error();
-    if (step === "categorization" && n) {
+    // Categorization and sift scale with n (per-feedback rate)
+    if ((step === "categorization" || step === "sift") && n) {
       const avgMsPerFeedback = timings.reduce((sum, t) => sum + t.ms / (t.n ?? n), 0) / timings.length;
       return Math.round(n * avgMsPerFeedback);
     }
-    // For report: simple average of raw durations (not per-feedback)
+    // All others: simple average of raw durations
     return Math.round(timings.reduce((sum, t) => sum + t.ms, 0) / timings.length);
   } catch {
-    return step === "categorization"
-      ? (n ?? 50) * FALLBACK_MS_PER_FEEDBACK
-      : FALLBACK_REPORT_MS;
+    if ((step === "categorization" || step === "sift") && n) {
+      return n * FALLBACK_MS_PER_FEEDBACK;
+    }
+    return FALLBACK_MS[step];
   }
 }
 
-function recordTiming(step: "categorization" | "report", ms: number, n?: number): void {
+function recordTiming(step: TimingStep, ms: number, n?: number): void {
   fetch(`${API_BASE}/api/timings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -111,8 +123,12 @@ export function useAnalysis() {
   const userStoryCardsRef = useRef<UserStoryCard[]>([]);
   const nonActionableItemsRef = useRef<string[]>([]);
   const actionableCountRef = useRef<number | null>(null);
+  const siftStartRef = useRef<number | null>(null);
+  const siftNRef = useRef<number>(0);
   const categorizationStartRef = useRef<number | null>(null);
+  const clusteringStartRef = useRef<number | null>(null);
   const reportStartRef = useRef<number | null>(null);
+  const stellaStartRef = useRef<number | null>(null);
   const nFeedbacksRef = useRef<number>(0);
   const lastCallRef = useRef<(() => (() => void) | Promise<() => void>) | null>(null);
 
@@ -126,8 +142,12 @@ export function useAnalysis() {
     userStoryCardsRef.current = [];
     nonActionableItemsRef.current = [];
     actionableCountRef.current = null;
+    siftStartRef.current = null;
+    siftNRef.current = 0;
     categorizationStartRef.current = null;
+    clusteringStartRef.current = null;
     reportStartRef.current = null;
+    stellaStartRef.current = null;
     nFeedbacksRef.current = 0;
   }, []);
 
@@ -146,33 +166,60 @@ export function useAnalysis() {
     if (event === "status") {
       const s = d.step as string;
       if (s === "scraping") setStep({ type: "scraping" });
-      else if (s === "sift") setStep({ type: "sift", startedAt: Date.now(), estimatedMs: 5000 });
-      else if (s === "report") {
-        // Set step immediately so Penn card activates without waiting for the fetch
+      else if (s === "sift") {
         const startedAt = Date.now();
-        reportStartRef.current = startedAt;
-        setStep({ type: "report", startedAt });
-        // Record categorization timing
+        siftStartRef.current = startedAt;
+        siftNRef.current = nFeedbacksRef.current; // raw input count, known before sift
+        // Fetch historical estimate, fill it in once available
+        fetchTimingEstimate("sift", siftNRef.current).then((estimatedMs) => {
+          setStep((prev) => prev.type === "sift" ? { ...prev, estimatedMs } : prev);
+        });
+        setStep({ type: "sift", startedAt });
+      }
+      else if (s === "clustering") {
+        const startedAt = Date.now();
+        clusteringStartRef.current = startedAt;
+        // Record categorization timing (Iris just finished)
         if (categorizationStartRef.current !== null && nFeedbacksRef.current > 0) {
           const elapsed = startedAt - categorizationStartRef.current;
           recordTiming("categorization", elapsed, nFeedbacksRef.current);
           categorizationStartRef.current = null;
         }
-        // Fetch estimate and fill it in once available
+        fetchTimingEstimate("clustering").then((estimatedMs) => {
+          setStep((prev) => prev.type === "clustering" ? { ...prev, estimatedMs } : prev);
+        });
+        setStep({ type: "clustering", startedAt });
+      }
+      else if (s === "report") {
+        const startedAt = Date.now();
+        reportStartRef.current = startedAt;
+        // Record clustering timing (Echo just finished)
+        if (clusteringStartRef.current !== null) {
+          const elapsed = startedAt - clusteringStartRef.current;
+          recordTiming("clustering", elapsed);
+          clusteringStartRef.current = null;
+        }
+        setStep({ type: "report", startedAt });
         fetchTimingEstimate("report").then((estimatedMs) => {
           setStep((prev) => prev.type === "report" ? { ...prev, estimatedMs } : prev);
         });
       }
-      else if (s === "clustering") {
-        // Start Echo timer + fetch estimate (cluster timing not persisted, use fixed fallback)
-        const startedAt = Date.now();
-        setStep({ type: "clustering", startedAt, estimatedMs: 8_000 });
-      }
       else if (s === "stella") {
-        // Nova is now active — keep it distinct from Penn
-        setStep({ type: "stella", startedAt: Date.now() });
+        const startedAt = Date.now();
+        stellaStartRef.current = startedAt;
+        // Record Penn timing (report event fires before stella status)
+        fetchTimingEstimate("stella").then((estimatedMs) => {
+          setStep((prev) => prev.type === "stella" ? { ...prev, estimatedMs } : prev);
+        });
+        setStep({ type: "stella", startedAt });
       }
     } else if (event === "sifted") {
+      // Sift finished — record timing
+      if (siftStartRef.current !== null) {
+        const elapsed = Date.now() - siftStartRef.current;
+        recordTiming("sift", elapsed, siftNRef.current);
+        siftStartRef.current = null;
+      }
       nonActionableItemsRef.current = (d.non_actionable as string[]) ?? [];
       actionableCountRef.current = d.actionable_count as number;
       nFeedbacksRef.current = d.actionable_count as number;
@@ -192,7 +239,7 @@ export function useAnalysis() {
       usedFallbackRef.current = fallback;
       setStep((prev) => prev.type === "categorization" ? { ...prev, usedFallback: fallback } : prev);
     } else if (event === "report") {
-      // Record Penn timing; keep step open — Nova may still run
+      // Penn finished — record timing
       if (reportStartRef.current !== null) {
         const elapsed = Date.now() - reportStartRef.current;
         recordTiming("report", elapsed);
@@ -203,6 +250,12 @@ export function useAnalysis() {
         fallback: d.used_fallback as boolean,
       };
     } else if (event === "user_stories") {
+      // Nova finished — record timing
+      if (stellaStartRef.current !== null) {
+        const elapsed = Date.now() - stellaStartRef.current;
+        recordTiming("stella", elapsed);
+        stellaStartRef.current = null;
+      }
       userStoryCardsRef.current = (d.cards as UserStoryCard[]) ?? [];
       setPartialItems((items) => {
         setStep({ type: "done", result: buildResult(items) });
