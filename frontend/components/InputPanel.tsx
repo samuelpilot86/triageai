@@ -13,6 +13,7 @@ interface Props {
   onAnalyzeText: (feedbacks: string[], appName?: string) => void;
   onAnalyzeCsv: (file: File) => void;
   onAnalyzeStore: (app: AppEntry, store: Store, count: number) => void;
+  onSourceChange?: (source: "googleplay" | "appstore" | "csv" | "text") => void;
   disabled?: boolean;
 }
 
@@ -36,13 +37,21 @@ const TAB_META: Record<Tab, { label: string; icon: React.ReactNode }> = {
   },
 };
 
-export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore, disabled }: Props) {
+export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore, onSourceChange, disabled }: Props) {
   const [tab, setTab] = useState<Tab>("demo");
   const [text, setText] = useState("");
   const [demoText, setDemoText] = useState(DEMO_FEEDBACKS);
   const [dragOver, setDragOver] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [store, setStore] = useState<Store>("googleplay");
+
+  // Notify parent of source changes for live pipeline preview
+  const notifySource = useCallback((newTab: Tab, newStore: Store) => {
+    if (!onSourceChange) return;
+    if (newTab === "store") onSourceChange(newStore === "googleplay" ? "googleplay" : "appstore");
+    else if (newTab === "csv") onSourceChange("csv");
+    else onSourceChange("text");
+  }, [onSourceChange]);
   const [reviewCount, setReviewCount] = useState<number>(100);
   const [categories, setCategories] = useState<string[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
@@ -57,10 +66,14 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Reset count when switching store
+  // Notify parent on mount with initial source
+  useEffect(() => { notifySource(tab, store); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset count + notify when switching store
   useEffect(() => {
     setReviewCount(store === "appstore" ? 50 : 100);
-  }, [store]);
+    if (tab === "store") notifySource("store", store);
+  }, [store]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch categories when store changes
   const loadCategories = useCallback(() => {
@@ -132,7 +145,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
         {(["store", "csv", "text", "demo"] as Tab[]).map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => { setTab(t); notifySource(t, store); }}
             className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors ${
               tab === t
                 ? "border-b-2 border-indigo-600 text-indigo-600"
@@ -239,7 +252,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
                 {(["googleplay", "appstore"] as Store[]).map((s) => (
                   <button
                     key={s}
-                    onClick={() => setStore(s)}
+                    onClick={() => { setStore(s); notifySource("store", s); }}
                     className={`px-4 py-2 text-sm font-medium transition-colors ${
                       store === s ? "bg-indigo-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
                     }`}
@@ -263,7 +276,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
                     onChange={(e) => setReviewCount(Number(e.target.value))}
                     className="w-full appearance-none px-3 py-2 pr-8 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
-                    {[50, 100].map((n) => (
+                    {[50, 100, 150, 200].map((n) => (
                       <option key={n} value={n}>{n} reviews</option>
                     ))}
                   </select>

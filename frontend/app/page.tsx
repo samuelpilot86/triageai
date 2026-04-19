@@ -9,12 +9,52 @@ import UserStoryCards from "@/components/UserStoryCards";
 import AgentPipeline, { PipelineSource } from "@/components/AgentPipeline";
 import { useAnalysis } from "@/lib/useAnalysis";
 import { RotateCcw } from "lucide-react";
+import { useState } from "react";
+
+function StaticSourcePill({ source }: { source: PipelineSource }) {
+  const base = "w-9 h-9 rounded-full flex items-center justify-center shrink-0 border border-gray-200 bg-white shadow-sm transition-all duration-300";
+  if (source === "googleplay") return (
+    <div className={base} title="Google Play">
+      <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+        <path d="M1.22 0c-.338.196-.22.618-.22 1.03v21.94c0 .414-.118.834.22 1.03l.08.06 12.28-12.26v-.3L1.3-.06l-.08.06z" fill="#4285F4"/>
+        <path d="M17.68 16.49l-4.09-4.1v-.3l4.09-4.09.09.05 4.84 2.75c1.38.78 1.38 2.06 0 2.84l-4.84 2.75-.09.05z" fill="#FBBC04"/>
+        <path d="M17.77 16.44L13.5 12 1.22 24.26c.456.484 1.207.544 1.74.14l14.81-7.96" fill="#EA4335"/>
+        <path d="M17.77 7.56L2.96.74C2.427.336 1.676.396 1.22.88L13.5 12l4.27-4.44z" fill="#34A853"/>
+      </svg>
+    </div>
+  );
+  if (source === "appstore") return (
+    <div className={base} title="App Store">
+      <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+        <defs><linearGradient id="asG2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#18BFFF"/><stop offset="100%" stopColor="#0075FF"/></linearGradient></defs>
+        <rect width="24" height="24" rx="5.5" fill="url(#asG2)"/>
+        <path d="M12 4.5L8.25 11h2.25v.01L8.06 14.5H6.5l-.01.01H5l1.94-3.38-.01-.01H5.25L9 4.5H12zm0 0l3.75 6.5h-2.25v.01l2.44 3.49H17.5l.01.01H19l-1.94-3.38.01-.01h1.68L15 4.5H12zm-2.12 10l.62 1.08.62-1.08H9.88z" fill="white"/>
+      </svg>
+    </div>
+  );
+  if (source === "csv") return (
+    <div className={base} title="CSV upload">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+    </div>
+  );
+  // text / demo
+  return (
+    <div className={base} title="Paste / Demo">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+      </svg>
+    </div>
+  );
+}
 
 export default function Home() {
   const { step, partialItems, appName, nonActionableItemsRef, analyzeText, analyzeCsv, analyzeStore, reset, retry } = useAnalysis();
   const resultsRef = useRef<HTMLDivElement>(null);
   const pipelineMetaRef = useRef<{ nFeedbacks?: number; clusterCount?: number; siftedCount?: number }>({});
   const sourceRef = useRef<PipelineSource | undefined>(undefined);
+  const [previewSource, setPreviewSource] = useState<PipelineSource>("text");
 
   // Persist pipeline metadata across step transitions
   if (step.type === "categorization") {
@@ -85,15 +125,8 @@ export default function Home() {
 
             {/* Agent pipeline preview */}
             <div className="flex items-center gap-0">
-              {/* Source pill — static, shows Google Play as example */}
-              <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-white border border-gray-200 shadow-sm" title="Google Play / App Store / CSV">
-                <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1.22 0c-.338.196-.22.618-.22 1.03v21.94c0 .414-.118.834.22 1.03l.08.06 12.28-12.26v-.3L1.3-.06l-.08.06z" fill="#4285F4"/>
-                  <path d="M17.68 16.49l-4.09-4.1v-.3l4.09-4.09.09.05 4.84 2.75c1.38.78 1.38 2.06 0 2.84l-4.84 2.75-.09.05z" fill="#FBBC04"/>
-                  <path d="M17.77 16.44L13.5 12 1.22 24.26c.456.484 1.207.544 1.74.14l14.81-7.96" fill="#EA4335"/>
-                  <path d="M17.77 7.56L2.96.74C2.427.336 1.676.396 1.22.88L13.5 12l4.27-4.44z" fill="#34A853"/>
-                </svg>
-              </div>
+              {/* Source pill — updates live with active tab/store */}
+              <StaticSourcePill source={previewSource} />
               <div className="w-3 h-0.5 bg-gray-200 shrink-0" />
 
               <div className="flex items-stretch gap-2 flex-1 min-w-0">
@@ -122,10 +155,8 @@ export default function Home() {
               <div className="w-3 h-0.5 bg-gray-200 shrink-0" />
               {/* Jira output pill */}
               <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-[#0052CC] shadow-sm" title="Jira">
-                <svg viewBox="0 0 32 32" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M15.88 0C11.37 0 8.34 3.12 8.34 7.74v1.04H3.07C3.07 13.44 6 16.6 10.38 16.6h1.32v8.44C11.7 29.08 14.84 32 19.44 32V10.42h5.29C24.73 5.66 21.7 0 15.88 0z" fill="white"/>
-                  <path d="M11.7 8.78H8.34c0 4.66 2.93 7.82 7.31 7.82h1.32V9.56l-.14-.78H11.7z" fill="rgba(255,255,255,0.55)"/>
-                  <path d="M16.88 17.04h-1.44c0 4.66 3.13 7.96 7.5 7.96v-7.18l-.13-.78h-5.93z" fill="rgba(255,255,255,0.55)"/>
+                <svg viewBox="0 0 24 24" width="17" height="17" xmlns="http://www.w3.org/2000/svg" fill="white">
+                  <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.004-1.005zm5.723-5.756H5.757a5.215 5.215 0 0 0 5.214 5.214h2.132v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.024-1.001zM23.013 0H11.476a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.49V1.005A1.001 1.001 0 0 0 23.013 0z"/>
                 </svg>
               </div>
             </div>
@@ -135,6 +166,7 @@ export default function Home() {
                 onAnalyzeText={(feedbacks, name) => { sourceRef.current = "text"; analyzeText(feedbacks, name); }}
                 onAnalyzeCsv={(file) => { sourceRef.current = "csv"; analyzeCsv(file); }}
                 onAnalyzeStore={(app, store, count) => { sourceRef.current = store === "googleplay" ? "googleplay" : "appstore"; analyzeStore(app, store, count); }}
+                onSourceChange={setPreviewSource}
                 disabled={isRunning}
               />
             </div>
