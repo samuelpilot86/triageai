@@ -22,7 +22,7 @@ const AGENTS: AgentDef[] = [
     id: "sift",
     name: "Sift",
     role: "Pre-filter",
-    emoji: "🪣",
+    emoji: "🎯",
     model: "Gemini 2.5 Flash Lite",
   },
   {
