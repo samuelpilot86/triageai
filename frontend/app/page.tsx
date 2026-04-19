@@ -98,7 +98,7 @@ export default function Home() {
 
               <div className="flex items-stretch gap-2 flex-1 min-w-0">
                 {[
-                  { emoji: "🪣", name: "Sift", role: "Pre-filter", model: "Gemini 2.5 Flash Lite", desc: "Filters non-actionable feedback" },
+                  { emoji: "🎯", name: "Sift", role: "Pre-filter", model: "Gemini 2.5 Flash Lite", desc: "Filters non-actionable feedback" },
                   { emoji: "🔬", name: "Iris", role: "Categorizer", model: "Groq · Llama 3.3 70B", desc: "Tags & prioritizes every feedback" },
                   { emoji: "🗂️", name: "Echo", role: "Cluster Analyst", model: "Gemini 2.5 Flash Lite", desc: "Groups feedbacks by semantic similarity" },
                   { emoji: "🖊️", name: "Penn", role: "Reporter", model: "Gemini 2.5 Flash", desc: "Writes the executive summary" },

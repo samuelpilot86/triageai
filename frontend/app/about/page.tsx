@@ -12,27 +12,35 @@ export const metadata: Metadata = {
 
 const AGENTS = [
   {
-    emoji: "🕸️",
-    name: "Webb",
-    role: "Web Scraper",
-    model: "Python scraper",
-    desc: "Fetches live reviews from App Store & Google Play via public APIs",
-    modelClass: "python",
+    emoji: "🎯",
+    name: "Sift",
+    role: "Pre-filter",
+    model: "Gemini 2.5 Flash Lite",
+    desc: "Batch-filters non-actionable reviews (spam, generic praise, off-topic) before the main pipeline runs",
+    modelClass: "gemini",
   },
   {
     emoji: "🔬",
     name: "Iris",
     role: "Categorizer",
     model: "Groq · Llama 3.3 70B",
-    desc: "Classifies, prioritizes & self-corrects in a single structured call",
+    desc: "Classifies, prioritizes & self-corrects in a single structured call — parallel chunks of 30",
     modelClass: "groq",
+  },
+  {
+    emoji: "🗂️",
+    name: "Echo",
+    role: "Cluster Analyst",
+    model: "Gemini 2.5 Flash Lite",
+    desc: "LLM-driven semantic clustering — one cluster = one potential Jira ticket, scored by volume & severity",
+    modelClass: "gemini",
   },
   {
     emoji: "🖊️",
     name: "Penn",
     role: "Reporter",
     model: "Gemini 2.5 Flash",
-    desc: "Synthesizes findings into a PM executive report",
+    desc: "Synthesizes top clusters into a PM executive report with prioritized recommendations",
     modelClass: "gemini",
   },
   {
@@ -40,34 +48,40 @@ const AGENTS = [
     name: "Nova",
     role: "Backlog Builder",
     model: "Gemini 2.5 Flash",
-    desc: "Generates RICE-scored sprint cards, ready for Jira",
+    desc: "Generates RICE-scored sprint cards with user stories and acceptance criteria, ready for Jira",
     modelClass: "gemini",
   },
 ];
 
 const MODEL_ROUTING = [
   {
-    agent: "Webb",
-    badge: "Python",
-    badgeClass: "bg-slate-100 text-slate-600",
-    why: "Pure data fetching — no LLM needed. Scraping App Store & Google Play APIs directly.",
+    agent: "Sift",
+    badge: "Gemini 2.5 Flash Lite",
+    badgeClass: "bg-indigo-100 text-indigo-800",
+    why: "Single batched call on the full review set. Speed matters here — we want to discard noise fast before spending Groq tokens on it. Flash Lite's context window handles up to 200 reviews easily.",
   },
   {
     agent: "Iris",
     badge: "Groq · Llama 3.3 70B",
     badgeClass: "bg-amber-100 text-amber-800",
-    why: "Structured JSON classification — speed matters, creativity doesn't. Groq's inference hardware makes this step visibly faster, and its free tier is generous enough for batch processing.",
+    why: "Structured JSON classification in parallel chunks of 30. Groq's inference hardware keeps this step under 30s even on large batches. Groq is protected for this step only — Sift and Echo use Gemini to preserve the daily token budget.",
+  },
+  {
+    agent: "Echo",
+    badge: "Gemini 2.5 Flash Lite",
+    badgeClass: "bg-indigo-100 text-indigo-800",
+    why: "LLM clustering over summaries — a small, semantically rich input. Gemini Flash Lite has enough reasoning capacity for coherent grouping at this scale, and its larger context fits all summaries in one shot.",
   },
   {
     agent: "Penn",
     badge: "Gemini 2.5 Flash",
-    badgeClass: "bg-indigo-100 text-indigo-800",
+    badgeClass: "bg-violet-100 text-violet-800",
     why: "Narrative synthesis for a stakeholder-facing report. Language quality is directly visible to the end user — best available free-tier model for this task.",
   },
   {
     agent: "Nova",
     badge: "Gemini 2.5 Flash",
-    badgeClass: "bg-indigo-100 text-indigo-800",
+    badgeClass: "bg-violet-100 text-violet-800",
     why: "RICE scoring, user story format, acceptance criteria — requires PM domain understanding and structured output. Gemini Flash handles both well.",
   },
 ];
@@ -150,11 +164,11 @@ export default function AboutPage() {
         <section>
           <SectionLabel>Architecture</SectionLabel>
           <h2 className="text-xl font-bold text-gray-900 mb-2">
-            Four specialized agents, one coordinated pipeline
+            Five specialized agents, one coordinated pipeline
           </h2>
           <p className="text-sm text-gray-500 mb-3 leading-relaxed">
             Each agent has a single, well-defined responsibility.
-            Because each step produces a discrete, inspectable output, it's straightforward to observe what
+            Because each step produces a discrete, inspectable output, it&apos;s straightforward to observe what
             each agent actually did — useful for spotting errors, tuning prompts, or understanding failure modes.
             It also lays the groundwork for automated testing: each step can be validated independently,
             with assertions on the output format and content before the next agent is triggered.
@@ -274,7 +288,6 @@ export default function AboutPage() {
           </h2>
           <p className="text-sm text-gray-500 mb-6 leading-relaxed">
             trIAge connects to two data sources and one delivery target. The pipeline runs from raw store reviews to a Jira ticket without leaving the interface.
-            The pipeline runs from raw store reviews to a Jira ticket without leaving the interface.
           </p>
 
           <div className="grid grid-cols-3 gap-3">
@@ -305,6 +318,41 @@ export default function AboutPage() {
           </div>
         </section>
 
+        {/* ── About the maker ── */}
+        <section>
+          <SectionLabel>Maker</SectionLabel>
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 flex flex-col sm:flex-row items-start gap-6">
+            <div className="shrink-0">
+              <div className="w-16 h-16 rounded-2xl bg-indigo-100 flex items-center justify-center text-3xl select-none">
+                👤
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Samuel PILOT</h3>
+              <p className="text-sm text-gray-500 leading-relaxed mb-4">
+                Product Manager with an engineering background, building at the intersection of AI and product strategy.
+                trIAge was designed as a concrete demonstration of agentic AI engineering applied to a real PM workflow.
+              </p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <a
+                  href="https://linktr.ee/samuelpilot"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 text-green-700 text-xs font-semibold hover:bg-green-100 transition-colors"
+                >
+                  🌳 LinkTree
+                </a>
+                <a
+                  href="mailto:samuelpilotbasse@gmail.com"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition-colors"
+                >
+                  ✉️ Contact
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* ── CTA ── */}
         <section className="rounded-2xl bg-gradient-to-br from-indigo-50 to-emerald-50 border border-indigo-100 p-8 text-center">
           <h3 className="text-lg font-bold text-gray-900 mb-2">See it in action</h3>
@@ -321,6 +369,16 @@ export default function AboutPage() {
         </section>
 
       </main>
+
+      <footer className="border-t border-gray-100 mt-6 py-4">
+        <div className="max-w-3xl mx-auto px-6 flex items-center justify-center gap-3 text-xs text-gray-400">
+          <span>Made by <span className="font-medium text-gray-500">Samuel PILOT</span></span>
+          <span>·</span>
+          <a href="https://linktr.ee/samuelpilot" target="_blank" rel="noopener noreferrer" className="hover:text-indigo-500 transition-colors">🌳 LinkTree</a>
+          <span>·</span>
+          <a href="mailto:samuelpilotbasse@gmail.com" className="hover:text-indigo-500 transition-colors">✉️ Contact</a>
+        </div>
+      </footer>
     </div>
   );
 }
