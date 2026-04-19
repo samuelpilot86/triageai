@@ -147,7 +147,7 @@ export default function AboutPage() {
             🔧 How it&apos;s built
           </div>
           <h1 className="text-3xl font-extrabold text-gray-900 leading-tight mb-4">
-            An agentic AI pipeline,<br />from raw reviews to your Jira backlog
+            An agentic AI pipeline,<br />from store reviews to your Jira backlog
           </h1>
           <p className="text-base text-gray-500 leading-relaxed max-w-xl">
             trIAge was built to demonstrate what agentic AI engineering looks like in a concrete product context —
