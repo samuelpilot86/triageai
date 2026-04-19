@@ -110,6 +110,7 @@ export function useAnalysis() {
   const reportRef = useRef<{ text: string; fallback: boolean } | null>(null);
   const userStoryCardsRef = useRef<UserStoryCard[]>([]);
   const nonActionableItemsRef = useRef<string[]>([]);
+  const actionableCountRef = useRef<number | null>(null);
   const categorizationStartRef = useRef<number | null>(null);
   const reportStartRef = useRef<number | null>(null);
   const nFeedbacksRef = useRef<number>(0);
@@ -124,6 +125,7 @@ export function useAnalysis() {
     reportRef.current = null;
     userStoryCardsRef.current = [];
     nonActionableItemsRef.current = [];
+    actionableCountRef.current = null;
     categorizationStartRef.current = null;
     reportStartRef.current = null;
     nFeedbacksRef.current = 0;
@@ -172,6 +174,7 @@ export function useAnalysis() {
       }
     } else if (event === "sifted") {
       nonActionableItemsRef.current = (d.non_actionable as string[]) ?? [];
+      actionableCountRef.current = d.actionable_count as number;
       nFeedbacksRef.current = d.actionable_count as number;
     } else if (event === "scraped") {
       setStep((prev) =>
@@ -304,5 +307,5 @@ export function useAnalysis() {
     if (lastCallRef.current) return lastCallRef.current();
   }, []);
 
-  return { step, partialItems, appName, nonActionableItemsRef, analyzeText, analyzeCsv, analyzeStore, reset, retry };
+  return { step, partialItems, appName, nonActionableItemsRef, actionableCountRef, analyzeText, analyzeCsv, analyzeStore, reset, retry };
 }

@@ -46,15 +46,21 @@ function StaticSourcePill({ source }: { source: PipelineSource }) {
 }
 
 export default function Home() {
-  const { step, partialItems, appName, nonActionableItemsRef, analyzeText, analyzeCsv, analyzeStore, reset, retry } = useAnalysis();
+  const { step, partialItems, appName, nonActionableItemsRef, actionableCountRef, analyzeText, analyzeCsv, analyzeStore, reset, retry } = useAnalysis();
   const resultsRef = useRef<HTMLDivElement>(null);
   const pipelineMetaRef = useRef<{ nFeedbacks?: number; clusterCount?: number; siftedCount?: number }>({});
   const sourceRef = useRef<PipelineSource | undefined>(undefined);
   const [previewSource, setPreviewSource] = useState<PipelineSource>("text");
 
   // Persist pipeline metadata across step transitions
-  if (step.type === "categorization") {
-    if (step.nFeedbacks !== undefined) {
+  // Use the actionable count (from sifted event) once available, else fall back to raw nFeedbacks
+  if (step.type === "categorization" || step.type === "clustering" || step.type === "report" || step.type === "stella" || step.type === "done") {
+    const actionable = actionableCountRef.current;
+    if (actionable !== null) {
+      pipelineMetaRef.current.siftedCount = actionable;
+      pipelineMetaRef.current.nFeedbacks = actionable;
+    } else if (step.type === "categorization" && step.nFeedbacks !== undefined) {
+      // Fallback: sifted event hasn't arrived yet (shouldn't happen, but safe)
       pipelineMetaRef.current.nFeedbacks = step.nFeedbacks;
       pipelineMetaRef.current.siftedCount = step.nFeedbacks;
     }
