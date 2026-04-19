@@ -186,6 +186,15 @@ export function useAnalysis() {
         });
         setStep({ type: "sift", startedAt });
       }
+      else if (s === "categorization") {
+        // Iris is now genuinely active — reset startedAt to the real start time
+        const startedAt = Date.now();
+        categorizationStartRef.current = startedAt;
+        setStep((prev) => {
+          const estimatedMs = prev.type === "categorization" ? prev.estimatedMs : undefined;
+          return { type: "categorization", startedAt, estimatedMs, nFeedbacks: nFeedbacksRef.current };
+        });
+      }
       else if (s === "clustering") {
         const startedAt = Date.now();
         clusteringStartRef.current = startedAt;
