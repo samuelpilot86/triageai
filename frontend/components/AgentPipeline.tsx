@@ -263,6 +263,75 @@ function Arrow({ active }: { active: boolean }) {
 }
 
 // ------------------------------------------------------------------
+// Source / output icon pills
+// ------------------------------------------------------------------
+
+export type PipelineSource = "googleplay" | "appstore" | "csv" | "text";
+
+function GooglePlayIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1.22 0c-.338.196-.22.618-.22 1.03v21.94c0 .414-.118.834.22 1.03l.08.06 12.28-12.26v-.3L1.3-.06l-.08.06z" fill="#4285F4"/>
+      <path d="M17.68 16.49l-4.09-4.1v-.3l4.09-4.09.09.05 4.84 2.75c1.38.78 1.38 2.06 0 2.84l-4.84 2.75-.09.05z" fill="#FBBC04"/>
+      <path d="M17.77 16.44L13.5 12 1.22 24.26c.456.484 1.207.544 1.74.14l14.81-7.96" fill="#EA4335"/>
+      <path d="M17.77 7.56L2.96.74C2.427.336 1.676.396 1.22.88L13.5 12l4.27-4.44z" fill="#34A853"/>
+    </svg>
+  );
+}
+
+function AppStoreIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="asGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#18BFFF"/>
+          <stop offset="100%" stopColor="#0075FF"/>
+        </linearGradient>
+      </defs>
+      <rect width="24" height="24" rx="5.5" fill="url(#asGrad)"/>
+      <path d="M12 4.5L8.25 11h2.25v.01L8.06 14.5H6.5l-.01.01H5l1.94-3.38-.01-.01H5.25L9 4.5H12zm0 0l3.75 6.5h-2.25v.01l2.44 3.49H17.5l.01.01H19l-1.94-3.38.01-.01h1.68L15 4.5H12zm-2.12 10l.62 1.08.62-1.08H9.88z" fill="white"/>
+    </svg>
+  );
+}
+
+function CsvIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+    </svg>
+  );
+}
+
+function JiraIcon() {
+  return (
+    <svg viewBox="0 0 32 32" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+      <path d="M15.88 0C11.37 0 8.34 3.12 8.34 7.74v1.04H3.07C3.07 13.44 6 16.6 10.38 16.6h1.32v8.44C11.7 29.08 14.84 32 19.44 32V10.42h5.29C24.73 5.66 21.7 0 15.88 0z" fill="white"/>
+      <path d="M11.7 8.78H8.34c0 4.66 2.93 7.82 7.31 7.82h1.32V9.56l-.14-.78H11.7z" fill="rgba(255,255,255,0.55)"/>
+      <path d="M16.88 17.04h-1.44c0 4.66 3.13 7.96 7.5 7.96v-7.18l-.13-.78h-5.93z" fill="rgba(255,255,255,0.55)"/>
+    </svg>
+  );
+}
+
+function SourcePill({ source }: { source: PipelineSource }) {
+  const base = "w-9 h-9 rounded-full flex items-center justify-center shrink-0 border shadow-sm";
+  if (source === "googleplay") return <div className={`${base} bg-white border-gray-200`} title="Google Play"><GooglePlayIcon /></div>;
+  if (source === "appstore")   return <div className={`${base} bg-white border-gray-200`} title="App Store"><AppStoreIcon /></div>;
+  return <div className={`${base} bg-white border-gray-200`} title="CSV / Paste"><CsvIcon /></div>;
+}
+
+function JiraPill() {
+  return (
+    <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-[#0052CC] shadow-sm" title="Jira">
+      <JiraIcon />
+    </div>
+  );
+}
+
+function PillConnector() {
+  return <div className="w-4 h-0.5 bg-gray-200 shrink-0" />;
+}
+
+// ------------------------------------------------------------------
 // Main component
 // ------------------------------------------------------------------
 
@@ -274,6 +343,7 @@ export default function AgentPipeline({
   irisFallback,
   reportFallback,
   siftFallback,
+  source,
 }: {
   step: AnalysisStep;
   nFeedbacks?: number;
@@ -282,6 +352,7 @@ export default function AgentPipeline({
   irisFallback?: boolean;
   reportFallback?: boolean;
   siftFallback?: boolean;
+  source?: PipelineSource;
 }) {
   const statuses = deriveStatuses(step);
 
@@ -310,21 +381,40 @@ export default function AgentPipeline({
       <p className="text-xs font-medium text-gray-400 mb-3 uppercase tracking-wide">
         Agent pipeline
       </p>
-      <div className="flex items-stretch gap-0">
-        {visibleAgents.map((agent, i) => (
-          <div key={agent.id} className="flex items-center flex-1 min-w-0 gap-0">
-            <AgentCard
-              agent={agent}
-              status={statuses[agent.id]}
-              step={step}
-              stat={stats[agent.id]}
-              usedFallback={fallbacks[agent.id] ?? false}
-            />
-            {i < visibleAgents.length - 1 && (
-              <Arrow active={statuses[agent.id] === "done"} />
-            )}
-          </div>
-        ))}
+      <div className="flex items-center gap-0">
+        {/* Source pill */}
+        {source && (
+          <>
+            <SourcePill source={source} />
+            <PillConnector />
+          </>
+        )}
+
+        {/* Agent cards */}
+        <div className="flex items-stretch gap-0 flex-1 min-w-0">
+          {visibleAgents.map((agent, i) => (
+            <div key={agent.id} className="flex items-center flex-1 min-w-0 gap-0">
+              <AgentCard
+                agent={agent}
+                status={statuses[agent.id]}
+                step={step}
+                stat={stats[agent.id]}
+                usedFallback={fallbacks[agent.id] ?? false}
+              />
+              {i < visibleAgents.length - 1 && (
+                <Arrow active={statuses[agent.id] === "done"} />
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Jira output pill */}
+        {source && (
+          <>
+            <PillConnector />
+            <JiraPill />
+          </>
+        )}
       </div>
     </div>
   );
