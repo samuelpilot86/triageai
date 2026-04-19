@@ -12,6 +12,11 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7860";
 const FALLBACK_MS_PER_FEEDBACK = 200;
 const FALLBACK_REPORT_MS = 15_000;
 
+// Must stay in sync with backend agent.py constants
+const SIFT_CHUNK_SIZE = 25;
+const GROQ_CHUNK_SIZE = 30;
+const SIFT_CHUNK_SIZE = 25; // must match backend SIFT_CHUNK_SIZE
+
 type TimingStep = "sift" | "categorization" | "clustering" | "report" | "stella";
 
 const FALLBACK_MS: Record<TimingStep, number> = {
@@ -28,18 +33,22 @@ async function fetchTimingEstimate(step: TimingStep, n?: number): Promise<number
     if (!res.ok) throw new Error();
     const { timings } = await res.json() as { timings: { ms: number; n?: number }[] };
     if (!timings.length) throw new Error();
-    // Categorization scales linearly with n (sequential per-feedback chunks)
+    // Batched parallel steps: wall-clock ≈ time for the largest chunk
     if (step === "categorization" && n) {
-      const avgMsPerFeedback = timings.reduce((sum, t) => sum + t.ms / (t.n ?? n), 0) / timings.length;
-      return Math.round(n * avgMsPerFeedback);
+      const effectiveN = Math.min(n, GROQ_CHUNK_SIZE);
+      const avgMsPerFeedback = timings.reduce((sum, t) => sum + t.ms / (t.n ?? effectiveN), 0) / timings.length;
+      return Math.round(effectiveN * avgMsPerFeedback);
     }
-    // All others (sift, clustering, report, stella): flat average — sift is parallelized so
-    // wall-clock ≈ max(chunk_time) which is roughly constant regardless of n
+    if (step === "sift" && n) {
+      const effectiveN = Math.min(n, SIFT_CHUNK_SIZE);
+      const avgMsPerFeedback = timings.reduce((sum, t) => sum + t.ms / (t.n ?? effectiveN), 0) / timings.length;
+      return Math.round(effectiveN * avgMsPerFeedback);
+    }
+    // clustering, report, stella: flat average
     return Math.round(timings.reduce((sum, t) => sum + t.ms, 0) / timings.length);
   } catch {
-    if (step === "categorization" && n) {
-      return n * FALLBACK_MS_PER_FEEDBACK;
-    }
+    if (step === "categorization" && n) return Math.min(n, GROQ_CHUNK_SIZE) * FALLBACK_MS_PER_FEEDBACK;
+    if (step === "sift" && n) return Math.min(n, SIFT_CHUNK_SIZE) * FALLBACK_MS_PER_FEEDBACK;
     return FALLBACK_MS[step];
   }
 }
@@ -172,7 +181,7 @@ export function useAnalysis() {
         siftStartRef.current = startedAt;
         siftNRef.current = nFeedbacksRef.current; // raw input count, known before sift
         // Fetch historical estimate, fill it in once available
-        fetchTimingEstimate("sift", siftNRef.current).then((estimatedMs) => {
+        fetchTimingEstimate("sift", nFeedbacksRef.current).then((estimatedMs) => {
           setStep((prev) => prev.type === "sift" ? { ...prev, estimatedMs } : prev);
         });
         setStep({ type: "sift", startedAt });
@@ -183,7 +192,7 @@ export function useAnalysis() {
         // Record categorization timing (Iris just finished)
         if (categorizationStartRef.current !== null && nFeedbacksRef.current > 0) {
           const elapsed = startedAt - categorizationStartRef.current;
-          recordTiming("categorization", elapsed, nFeedbacksRef.current);
+          recordTiming("categorization", elapsed, Math.min(nFeedbacksRef.current, GROQ_CHUNK_SIZE));
           categorizationStartRef.current = null;
         }
         fetchTimingEstimate("clustering").then((estimatedMs) => {
@@ -218,7 +227,7 @@ export function useAnalysis() {
       // Sift finished — record timing
       if (siftStartRef.current !== null) {
         const elapsed = Date.now() - siftStartRef.current;
-        recordTiming("sift", elapsed); // no n — parallel chunks, wall-clock is flat
+        recordTiming("sift", elapsed, Math.min(siftNRef.current, SIFT_CHUNK_SIZE));
         siftStartRef.current = null;
       }
       nonActionableItemsRef.current = (d.non_actionable as string[]) ?? [];
