@@ -8,7 +8,7 @@ import { ExecutiveReport, FeedbackStats, FallbackBanner, IrisCorrections } from 
 import UserStoryCards from "@/components/UserStoryCards";
 import AgentPipeline, { PipelineSource } from "@/components/AgentPipeline";
 import { useAnalysis } from "@/lib/useAnalysis";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, ClipboardList, FileSpreadsheet } from "lucide-react";
 import { useState } from "react";
 
 function StaticSourcePill({ source }: { source: PipelineSource }) {
@@ -26,25 +26,21 @@ function StaticSourcePill({ source }: { source: PipelineSource }) {
   if (source === "appstore") return (
     <div className={base} title="App Store">
       <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
-        <defs><linearGradient id="asG2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#18BFFF"/><stop offset="100%" stopColor="#0075FF"/></linearGradient></defs>
-        <rect width="24" height="24" rx="5.5" fill="url(#asG2)"/>
-        <path d="M12 4.5L8.25 11h2.25v.01L8.06 14.5H6.5l-.01.01H5l1.94-3.38-.01-.01H5.25L9 4.5H12zm0 0l3.75 6.5h-2.25v.01l2.44 3.49H17.5l.01.01H19l-1.94-3.38.01-.01h1.68L15 4.5H12zm-2.12 10l.62 1.08.62-1.08H9.88z" fill="white"/>
+        <rect width="24" height="24" rx="5.5" fill="#0D96F6"/>
+        <path d="M15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701z" fill="white" transform="translate(0,2)"/>
+        <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.029 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09z" fill="white" transform="translate(0,2) scale(0.83) translate(1.5,0)"/>
       </svg>
     </div>
   );
   if (source === "csv") return (
     <div className={base} title="CSV upload">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
-        <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-      </svg>
+      <FileSpreadsheet className="w-5 h-5 text-gray-500" />
     </div>
   );
   // text / demo
   return (
     <div className={base} title="Paste / Demo">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
-        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
-      </svg>
+      <ClipboardList className="w-5 h-5 text-gray-500" />
     </div>
   );
 }

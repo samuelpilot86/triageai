@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnalysisStep } from "@/lib/types";
-import { CheckCircle2, Loader2, Clock } from "lucide-react";
+import { CheckCircle2, Loader2, Clock, ClipboardList, FileSpreadsheet } from "lucide-react";
 
 // ------------------------------------------------------------------
 // Agent definitions
@@ -280,16 +280,12 @@ function GooglePlayIcon() {
 }
 
 function AppStoreIcon() {
+  // Apple logo (universally recognised as App Store) on blue background
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="asGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#18BFFF"/>
-          <stop offset="100%" stopColor="#0075FF"/>
-        </linearGradient>
-      </defs>
-      <rect width="24" height="24" rx="5.5" fill="url(#asGrad)"/>
-      <path d="M12 4.5L8.25 11h2.25v.01L8.06 14.5H6.5l-.01.01H5l1.94-3.38-.01-.01H5.25L9 4.5H12zm0 0l3.75 6.5h-2.25v.01l2.44 3.49H17.5l.01.01H19l-1.94-3.38.01-.01h1.68L15 4.5H12zm-2.12 10l.62 1.08.62-1.08H9.88z" fill="white"/>
+      <rect width="24" height="24" rx="5.5" fill="#0D96F6"/>
+      <path d="M15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701z" fill="white" transform="translate(0,2)"/>
+      <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.029 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09z" fill="white" transform="translate(0,2) scale(0.83) translate(1.5,0)"/>
     </svg>
   );
 }
@@ -315,7 +311,8 @@ function SourcePill({ source }: { source: PipelineSource }) {
   const base = "w-9 h-9 rounded-full flex items-center justify-center shrink-0 border shadow-sm";
   if (source === "googleplay") return <div className={`${base} bg-white border-gray-200`} title="Google Play"><GooglePlayIcon /></div>;
   if (source === "appstore")   return <div className={`${base} bg-white border-gray-200`} title="App Store"><AppStoreIcon /></div>;
-  return <div className={`${base} bg-white border-gray-200`} title="CSV / Paste"><CsvIcon /></div>;
+  if (source === "csv")        return <div className={`${base} bg-white border-gray-200`} title="CSV upload"><FileSpreadsheet className="w-5 h-5 text-gray-500" /></div>;
+  return <div className={`${base} bg-white border-gray-200`} title="Paste / Demo"><ClipboardList className="w-5 h-5 text-gray-500" /></div>;
 }
 
 function JiraPill() {
