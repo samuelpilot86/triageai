@@ -16,7 +16,7 @@ const AGENTS = [
     name: "Sift",
     role: "Pre-filter",
     model: "Gemini 2.5 Flash Lite",
-    desc: "Batch-filters non-actionable reviews (spam, generic praise, off-topic) before the main pipeline runs",
+    desc: "Filters non-actionable reviews (spam, generic praise, off-topic)",
     modelClass: "gemini",
   },
   {
@@ -24,7 +24,7 @@ const AGENTS = [
     name: "Iris",
     role: "Categorizer",
     model: "Groq · Llama 3.3 70B",
-    desc: "Classifies, prioritizes & self-corrects in a single structured call — parallel chunks of 30",
+    desc: "Classifies, prioritizes & self-corrects in a single structured call",
     modelClass: "groq",
   },
   {
@@ -32,7 +32,7 @@ const AGENTS = [
     name: "Echo",
     role: "Cluster Analyst",
     model: "Gemini 2.5 Flash Lite",
-    desc: "LLM-driven semantic clustering — one cluster = one potential Jira ticket, scored by volume & severity",
+    desc: "LLM-driven semantic clustering — one cluster = one Jira ticket, scored by volume & severity",
     modelClass: "gemini",
   },
   {
@@ -48,7 +48,7 @@ const AGENTS = [
     name: "Nova",
     role: "Backlog Builder",
     model: "Gemini 2.5 Flash",
-    desc: "Generates RICE-scored sprint cards with user stories and acceptance criteria, ready for Jira",
+    desc: "Generates RICE-scored sprint cards with US and acceptance criteria, ready for Jira",
     modelClass: "gemini",
   },
 ];
@@ -58,13 +58,13 @@ const MODEL_ROUTING = [
     agent: "Sift",
     badge: "Gemini 2.5 Flash Lite",
     badgeClass: "bg-indigo-100 text-indigo-800",
-    why: "Single batched call on the full review set. Speed matters here — we want to discard noise fast before spending Groq tokens on it. Flash Lite's context window handles up to 200 reviews easily.",
+    why: "Single batched call on the full review set, in order to quickly discard non-actionable feedbacks and spare tokens downstream.",
   },
   {
     agent: "Iris",
     badge: "Groq · Llama 3.3 70B",
     badgeClass: "bg-amber-100 text-amber-800",
-    why: "Structured JSON classification in parallel chunks of 30. Groq's inference hardware keeps this step under 30s even on large batches. Groq is protected for this step only — Sift and Echo use Gemini to preserve the daily token budget.",
+    why: "Structured JSON classification in parallel chunks of 30. Groq's inference hardware keeps this step under 30s even on large batches. Groq is reserved to this step only.",
   },
   {
     agent: "Echo",
@@ -150,13 +150,10 @@ export default function AboutPage() {
             An agentic AI pipeline,<br />from store reviews to your Jira backlog
           </h1>
           <p className="text-base text-gray-500 leading-relaxed max-w-xl">
-            trIAge was built to demonstrate what agentic AI engineering looks like in a concrete product context —
-            not to validate a market opportunity. The goal: chain specialized agents, route tasks to the right
-            models, and wire up real external systems end-to-end.
+            trIAge showcases Samuel's agentic AI prototyping skills. The goal: chain specialized agents, route tasks to the right models, and wire up real external systems end-to-end.
           </p>
           <p className="text-base text-gray-500 leading-relaxed max-w-xl mt-3">
-            The result turns out to be practically useful too: a fast, zero-setup way to turn any app's reviews
-            into a structured analysis and a sprint-ready backlog — for your own product or a competitor's.
+            The result: a fast, zero-setup way to analyze any app's reviews - for your product or a competitor's - and draft sprint-ready backlog.
           </p>
         </section>
 
@@ -167,11 +164,8 @@ export default function AboutPage() {
             Five specialized agents, one coordinated pipeline
           </h2>
           <p className="text-sm text-gray-500 mb-3 leading-relaxed">
-            Each agent has a single, well-defined responsibility.
-            Because each step produces a discrete, inspectable output, it&apos;s straightforward to observe what
-            each agent actually did — useful for spotting errors, tuning prompts, or understanding failure modes.
-            It also lays the groundwork for automated testing: each step can be validated independently,
-            with assertions on the output format and content before the next agent is triggered.
+            Each agent has a single responsibility, making it easy to spot errors and tune prompts. 
+            It also lays the groundwork for automated testing for scaling purposes.
           </p>
 
           {/* Agent cards */}
@@ -194,25 +188,17 @@ export default function AboutPage() {
               </div>
             ))}
           </div>
-
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-800 leading-relaxed">
-            Results stream to the UI in real time via{" "}
-            <span className="font-semibold">Server-Sent Events</span> — each
-            agent's output appears as soon as it's ready, without waiting for the full pipeline to complete.
-            Every step is visible: you watch the agents work rather than staring at a spinner.
-          </div>
         </section>
 
         {/* ── Model routing ── */}
         <section>
           <SectionLabel>Model routing</SectionLabel>
           <h2 className="text-xl font-bold text-gray-900 mb-2">
-            The right model for the right task
+            Speed where it matters, quality where it shows
           </h2>
           <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-            Using a single model for every step is the path of least resistance. Routing by task type is a
-            deliberate choice: it reduces latency where speed matters, and preserves quality where the output
-            is directly visible to the end user.
+            TO BE BETTER WRITTEN - Routing by task type reduces latency where speed matters, preserves quality where the output
+            is directly visible to the end user and preserves inference budget.
           </p>
 
           <div className="rounded-xl border border-gray-200 overflow-hidden">
