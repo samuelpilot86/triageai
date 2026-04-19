@@ -11,6 +11,7 @@ Model routing:
   - Nova  (sprint cards)   : Cerebras / Qwen 3 235B — same rationale as Penn.
 """
 
+import asyncio
 import json
 import re
 import pandas as pd
@@ -139,6 +140,7 @@ _TOKENS_OVERHEAD = 512
 # At ~1 500 tokens of input overhead + 250 per feedback output,
 # max safe feedbacks per call = floor((12000 - 1500) / 250) = 42.
 GROQ_CHUNK_SIZE = 30
+SIFT_CHUNK_SIZE = 25   # Sift parallelization: 25 feedbacks/chunk → 4 parallel calls on 100 feedbacks
 
 
 class FeedbackTriageAgent:
@@ -463,10 +465,26 @@ IMPORTANT RULES FOR CORRECTIONS:
     async def sift_feedbacks(self, feedbacks: list[str]) -> tuple[list[str], list[str]]:
         """
         Filters feedbacks into actionable and non-actionable.
-        Uses _call_llm with gpt-oss-120b (Cerebras) — fast MoE, minimal output.
+        Splits into SIFT_CHUNK_SIZE chunks and runs them in parallel on Cerebras.
         Returns (actionable_texts, non_actionable_texts).
         """
-        numbered = "\n".join(f"{i + 1}. {f}" for i, f in enumerate(feedbacks))
+        chunks = [feedbacks[i:i + SIFT_CHUNK_SIZE] for i in range(0, len(feedbacks), SIFT_CHUNK_SIZE)]
+        tasks = [self._sift_chunk(chunk, global_offset=i * SIFT_CHUNK_SIZE) for i, chunk in enumerate(chunks)]
+        chunk_results = await asyncio.gather(*tasks)
+
+        actionable: list[str] = []
+        non_actionable: list[str] = []
+        for a, na in chunk_results:
+            actionable.extend(a)
+            non_actionable.extend(na)
+        return actionable, non_actionable
+
+    async def _sift_chunk(self, chunk: list[str], global_offset: int) -> tuple[list[str], list[str]]:
+        """
+        Sift a single chunk of feedbacks. IDs in the prompt are local (1-based);
+        results are mapped back using global_offset.
+        """
+        numbered = "\n".join(f"{i + 1}. {f}" for i, f in enumerate(chunk))
         prompt = f"""You are filtering product feedback for a PM. Return ONLY a JSON array of IDs (integers) for feedbacks that are actionable — meaning they contain a specific bug, feature request, UX issue, or reproducible problem. Exclude: generic praise ("great app"), gibberish, off-topic content, or vague emotional reactions with no product signal.
 
 FEEDBACKS:
@@ -474,25 +492,24 @@ FEEDBACKS:
 
 Return ONLY valid JSON array of integers, e.g.: [1, 3, 5]"""
 
-        text, _ = await self._call_llm(prompt, max_tokens=1000, cerebras_model=CEREBRAS_STRUCTURED_MODEL)
-        # Parse the JSON array
+        import logging as _logging
+        try:
+            text, _ = await self._call_llm(prompt, max_tokens=500, cerebras_model=CEREBRAS_STRUCTURED_MODEL)
+        except Exception as e:
+            _logging.getLogger("triage").warning("_sift_chunk(offset=%d): call failed, treating all as actionable. Error: %s", global_offset, e)
+            return chunk, []
+
         try:
             clean = re.sub(r"```(?:json)?\s*\n?", "", text)
             clean = re.sub(r"\n?```", "", clean).strip()
-            # Extract array from possible surrounding text
             m = re.search(r'\[[\d,\s]*\]', clean)
-            if m:
-                actionable_ids = set(json.loads(m.group(0)))
-            else:
-                actionable_ids = set(json.loads(clean))
+            actionable_ids = set(json.loads(m.group(0) if m else clean))
         except Exception:
-            # On parse failure, treat all as actionable
-            import logging as _logging
-            _logging.getLogger("triage").warning("sift_feedbacks: failed to parse LLM response, treating all as actionable. Raw: %s", text[:300])
-            return feedbacks, []
+            _logging.getLogger("triage").warning("_sift_chunk(offset=%d): parse failed, treating all as actionable. Raw: %s", global_offset, text[:200])
+            return chunk, []
 
-        actionable = [f for i, f in enumerate(feedbacks, 1) if i in actionable_ids]
-        non_actionable = [f for i, f in enumerate(feedbacks, 1) if i not in actionable_ids]
+        actionable = [f for i, f in enumerate(chunk, 1) if i in actionable_ids]
+        non_actionable = [f for i, f in enumerate(chunk, 1) if i not in actionable_ids]
         return actionable, non_actionable
 
     # ------------------------------------------------------------------
