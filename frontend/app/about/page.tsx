@@ -15,74 +15,74 @@ const AGENTS = [
     emoji: "🎯",
     name: "Sift",
     role: "Pre-filter",
-    model: "Gemini 2.5 Flash Lite",
+    model: "Cerebras · gpt-oss-120b",
     desc: "Filters non-actionable reviews (spam, generic praise, off-topic)",
-    modelClass: "gemini",
+    modelClass: "cerebras",
   },
   {
     emoji: "🔬",
     name: "Iris",
     role: "Categorizer",
-    model: "Groq · Llama 3.3 70B",
+    model: "Gemini 3.1 Flash Lite",
     desc: "Classifies, prioritizes & self-corrects in a single structured call",
-    modelClass: "groq",
+    modelClass: "gemini",
   },
   {
     emoji: "🗂️",
     name: "Echo",
     role: "Cluster Analyst",
-    model: "Gemini 2.5 Flash Lite",
+    model: "Cerebras · gpt-oss-120b",
     desc: "LLM-driven semantic clustering — one cluster = one Jira ticket, scored by volume & severity",
-    modelClass: "gemini",
+    modelClass: "cerebras",
   },
   {
     emoji: "🖊️",
     name: "Penn",
     role: "Reporter",
-    model: "Gemini 2.5 Flash",
+    model: "Cerebras · Qwen 3 235B",
     desc: "Synthesizes top clusters into a PM executive report with prioritized recommendations",
-    modelClass: "gemini",
+    modelClass: "cerebras",
   },
   {
     emoji: "🃏",
     name: "Nova",
     role: "Backlog Builder",
-    model: "Gemini 2.5 Flash",
+    model: "Cerebras · Qwen 3 235B",
     desc: "Generates RICE-scored sprint cards with US and acceptance criteria, ready for Jira",
-    modelClass: "gemini",
+    modelClass: "cerebras",
   },
 ];
 
 const MODEL_ROUTING = [
   {
     agent: "Sift",
-    badge: "Gemini 2.5 Flash Lite",
-    badgeClass: "bg-indigo-100 text-indigo-800",
-    why: "Single batched call on the full review set, in order to quickly discard non-actionable feedbacks and spare tokens downstream.",
+    badge: "Cerebras · gpt-oss-120b",
+    badgeClass: "bg-orange-100 text-orange-800",
+    why: "Single batched call on the full review set to discard non-actionable feedbacks. Cerebras' wafer-scale inference (~2100 tok/s) keeps this cheap step near-instant, and gpt-oss-120b's 90% MMLU-Pro is overkill for a binary filter — but the generous 1M tokens/day free quota makes it the right default.",
   },
   {
     agent: "Iris",
-    badge: "Groq · Llama 3.3 70B",
-    badgeClass: "bg-amber-100 text-amber-800",
-    why: "Structured JSON classification in parallel chunks of 30. Groq's inference hardware keeps this step under 30s even on large batches. Groq is reserved to this step only.",
+    badge: "Gemini 3.1 Flash Lite",
+    badgeClass: "bg-indigo-100 text-indigo-800",
+    why: "The heaviest step: 4 parallel chunks of structured JSON classification with self-review. Gemini 3.1 Flash Lite's 500 RPD (vs 20 on 2.5) and 250K TPM absorb the per-run fan-out without throttling, enabling several dozen analyses per day on free tier.",
   },
   {
     agent: "Echo",
-    badge: "Gemini 2.5 Flash Lite",
-    badgeClass: "bg-indigo-100 text-indigo-800",
-    why: "LLM clustering over summaries — a small, semantically rich input. Gemini Flash Lite has enough reasoning capacity for coherent grouping at this scale, and its larger context fits all summaries in one shot.",
+    badge: "Cerebras · gpt-oss-120b",
+    badgeClass: "bg-orange-100 text-orange-800",
+    why: "LLM clustering over summaries — small, semantically rich input. gpt-oss-120b's reasoning is more than enough for coherent grouping, and Cerebras' 1M TPD headroom means clustering never becomes the bottleneck on repeated runs.",
   },
   {
     agent: "Penn",
-    badge: "Gemini 2.5 Flash",
-    badgeClass: "bg-violet-100 text-violet-800",
-    why: "Narrative synthesis for a stakeholder-facing report. Language quality is directly visible to the end user — best available free-tier model for this task.",
+    badge: "Cerebras · Qwen 3 235B",
+    badgeClass: "bg-rose-100 text-rose-800",
+    why: "Narrative synthesis for a stakeholder-facing report. Qwen 3 235B (MMLU-Redux 93.1, approaching Claude Opus 4's 94.2) delivers near-frontier writing quality; Cerebras serves it at ~2000 tok/s so a rich report still renders in seconds.",
   },
   {
     agent: "Nova",
-    badge: "Gemini 2.5 Flash",
-    badgeClass: "bg-violet-100 text-violet-800",
-    why: "RICE scoring, user story format, acceptance criteria — requires PM domain understanding and structured output. Gemini Flash handles both well.",
+    badge: "Cerebras · Qwen 3 235B",
+    badgeClass: "bg-rose-100 text-rose-800",
+    why: "RICE scoring, user story format, acceptance criteria — requires PM domain understanding and structured output. Same reasoning muscle as Penn, same throughput budget, same free-tier pool.",
   },
 ];
 
@@ -112,7 +112,7 @@ const INTEGRATIONS = [
 
 const STACK = [
   "Next.js", "FastAPI", "Server-Sent Events",
-  "Gemini 2.5 Flash", "Groq · Llama 3.3 70B",
+  "Cerebras · gpt-oss-120b", "Cerebras · Qwen 3 235B", "Gemini 3.1 Flash Lite",
   "Google Play API", "App Store API", "Jira REST API v3",
   "Vercel", "HuggingFace Spaces",
 ];
@@ -177,8 +177,9 @@ export default function AboutPage() {
                   <div className="text-xs font-bold text-gray-900">{a.name}</div>
                   <div className="text-[10px] font-semibold text-indigo-500 mb-1">{a.role}</div>
                   <div className={`text-[9px] font-mono mb-2 ${
-                    a.modelClass === "groq" ? "text-amber-700" :
-                    a.modelClass === "gemini" ? "text-indigo-500" : "text-gray-400"
+                    a.modelClass === "cerebras" ? "text-orange-600" :
+                    a.modelClass === "gemini" ? "text-indigo-500" :
+                    a.modelClass === "groq" ? "text-amber-700" : "text-gray-400"
                   }`}>{a.model}</div>
                   <div className="text-[10px] text-gray-500 leading-snug">{a.desc}</div>
                 </div>
@@ -197,8 +198,9 @@ export default function AboutPage() {
             Speed where it matters, quality where it shows
           </h2>
           <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-            TO BE BETTER WRITTEN - Routing by task type reduces latency where speed matters, preserves quality where the output
-            is directly visible to the end user and preserves inference budget.
+            Each step is routed to the provider whose free-tier quota, throughput, and model quality best match its workload.
+            Cerebras handles the heavy reasoning at wafer-scale speed; Gemini absorbs the parallel fan-out of the categorization step.
+            Together they keep the full pipeline under a minute while staying within free-tier limits for dozens of runs per day.
           </p>
 
           <div className="rounded-xl border border-gray-200 overflow-hidden">
@@ -259,10 +261,9 @@ export default function AboutPage() {
 
           <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-600 leading-relaxed">
             <span className="font-semibold text-gray-900">Why it's efficient:</span>{" "}
-            A second agent reviewing Iris's output would mean a second API call — and Groq's free tier
-            enforces limits on both tokens per minute and number of requests. Structuring the prompt in two
-            explicit phases achieves similar precision in a single round-trip — a deliberate choice over
-            naive agent chaining.
+            A second agent reviewing Iris's output would mean a second API call — and free-tier providers enforce
+            limits on both tokens per minute and daily request count. Structuring the prompt in two explicit phases
+            achieves similar precision in a single round-trip — a deliberate choice over naive agent chaining.
           </div>
         </section>
 

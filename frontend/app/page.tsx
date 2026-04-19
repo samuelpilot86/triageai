@@ -127,11 +127,11 @@ export default function Home() {
 
               <div className="flex items-stretch gap-2 flex-1 min-w-0">
                 {[
-                  { emoji: "🎯", name: "Sift", role: "Pre-filter", model: "Gemini 2.5 Flash Lite", desc: "Filters non-actionable feedback" },
-                  { emoji: "🔬", name: "Iris", role: "Categorizer", model: "Groq · Llama 3.3 70B", desc: "Tags & prioritizes every feedback" },
-                  { emoji: "🗂️", name: "Echo", role: "Cluster Analyst", model: "Gemini 2.5 Flash Lite", desc: "Groups feedbacks by semantic similarity" },
-                  { emoji: "🖊️", name: "Penn", role: "Reporter", model: "Gemini 2.5 Flash", desc: "Writes the executive summary" },
-                  { emoji: "🃏", name: "Nova", role: "Backlog Builder", model: "Gemini 2.5 Flash", desc: "Generates sprint cards with RICE scoring" },
+                  { emoji: "🎯", name: "Sift", role: "Pre-filter", model: "Cerebras · gpt-oss-120b", desc: "Filters non-actionable feedback" },
+                  { emoji: "🔬", name: "Iris", role: "Categorizer", model: "Gemini 3.1 Flash Lite", desc: "Tags & prioritizes every feedback" },
+                  { emoji: "🗂️", name: "Echo", role: "Cluster Analyst", model: "Cerebras · gpt-oss-120b", desc: "Groups feedbacks by semantic similarity" },
+                  { emoji: "🖊️", name: "Penn", role: "Reporter", model: "Cerebras · Qwen 3 235B", desc: "Writes the executive summary" },
+                  { emoji: "🃏", name: "Nova", role: "Backlog Builder", model: "Cerebras · Qwen 3 235B", desc: "Generates sprint cards with RICE scoring" },
                 ].map((a, i, arr) => (
                   <div key={a.name} className="flex items-center flex-1 min-w-0 gap-2">
                     <div className="flex-1 min-w-0 rounded-xl border border-gray-200 bg-white p-3 text-center">
@@ -175,7 +175,7 @@ export default function Home() {
           const isQuotaExhausted = /quota exhausted|429|RESOURCE_EXHAUSTED/i.test(msg);
           const isTransient = /503|UNAVAILABLE|high demand|rate.?limit|try again/i.test(msg);
           const friendly = isQuotaExhausted
-            ? "Daily free-tier quota exhausted on both Groq and Gemini. Retry in a few minutes (Groq resets quickly) or tomorrow (Gemini resets at midnight Pacific)."
+            ? "Daily free-tier quota exhausted across Cerebras, Gemini and fallback providers. Retry in a few minutes or tomorrow (Gemini resets at midnight Pacific, Cerebras resets daily)."
             : isTransient
             ? "The AI model is temporarily overloaded. This usually clears up within a minute."
             : "Something went wrong during the analysis.";

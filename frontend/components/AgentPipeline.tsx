@@ -23,35 +23,35 @@ const AGENTS: AgentDef[] = [
     name: "Sift",
     role: "Pre-filter",
     emoji: "🎯",
-    model: "Gemini 2.5 Flash Lite",
+    model: "Cerebras · gpt-oss-120b",
   },
   {
     id: "categorization",
     name: "Iris",
     role: "Categorizer",
     emoji: "🔬",
-    model: "Groq · Llama 3.3 70B",
+    model: "Gemini 3.1 Flash Lite",
   },
   {
     id: "clustering",
     name: "Echo",
     role: "Cluster Analyst",
     emoji: "🗂️",
-    model: "Gemini 2.5 Flash Lite",
+    model: "Cerebras · gpt-oss-120b",
   },
   {
     id: "report",
     name: "Penn",
     role: "Reporter",
     emoji: "🖊️",
-    model: "Gemini 2.5 Flash",
+    model: "Cerebras · Qwen 3 235B",
   },
   {
     id: "stella",
     name: "Nova",
     role: "Story Writer",
     emoji: "🃏",
-    model: "Gemini 2.5 Flash",
+    model: "Cerebras · Qwen 3 235B",
   },
 ];
 
@@ -150,11 +150,11 @@ function IrisProgressBar({
 // ------------------------------------------------------------------
 
 const FALLBACK_CHAINS: Record<string, string> = {
-  sift: "Gemini 2.5 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
-  categorization: "Groq · Llama 3.3 70B → OpenRouter · auto → Gemini 2.5 Flash Lite",
-  clustering: "Gemini 2.5 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
-  report: "Gemini 2.5 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
-  stella: "Gemini 2.5 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
+  sift: "Cerebras · gpt-oss-120b → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
+  categorization: "Gemini 3.1 Flash Lite → Groq · Llama 3.3 70B → OpenRouter · auto",
+  clustering: "Cerebras · gpt-oss-120b → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
+  report: "Cerebras · Qwen 3 235B → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
+  stella: "Cerebras · Qwen 3 235B → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
 };
 
 function AgentCard({

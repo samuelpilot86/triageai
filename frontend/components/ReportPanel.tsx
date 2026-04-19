@@ -79,7 +79,7 @@ export function FallbackBanner({ used_fallback, report_fallback }: { used_fallba
   if (!used_fallback && !report_fallback) return null;
   return (
     <p className="text-xs text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg">
-      ⚠️ Gemini quota reached — analysis performed by Llama 3.3 70B (Groq). Results may vary slightly.
+      ⚠️ Primary provider quota reached — analysis performed by a fallback model. Results may vary slightly.
     </p>
   );
 }
