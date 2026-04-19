@@ -28,15 +28,16 @@ async function fetchTimingEstimate(step: TimingStep, n?: number): Promise<number
     if (!res.ok) throw new Error();
     const { timings } = await res.json() as { timings: { ms: number; n?: number }[] };
     if (!timings.length) throw new Error();
-    // Categorization and sift scale with n (per-feedback rate)
-    if ((step === "categorization" || step === "sift") && n) {
+    // Categorization scales linearly with n (sequential per-feedback chunks)
+    if (step === "categorization" && n) {
       const avgMsPerFeedback = timings.reduce((sum, t) => sum + t.ms / (t.n ?? n), 0) / timings.length;
       return Math.round(n * avgMsPerFeedback);
     }
-    // All others: simple average of raw durations
+    // All others (sift, clustering, report, stella): flat average — sift is parallelized so
+    // wall-clock ≈ max(chunk_time) which is roughly constant regardless of n
     return Math.round(timings.reduce((sum, t) => sum + t.ms, 0) / timings.length);
   } catch {
-    if ((step === "categorization" || step === "sift") && n) {
+    if (step === "categorization" && n) {
       return n * FALLBACK_MS_PER_FEEDBACK;
     }
     return FALLBACK_MS[step];
@@ -217,7 +218,7 @@ export function useAnalysis() {
       // Sift finished — record timing
       if (siftStartRef.current !== null) {
         const elapsed = Date.now() - siftStartRef.current;
-        recordTiming("sift", elapsed, siftNRef.current);
+        recordTiming("sift", elapsed); // no n — parallel chunks, wall-clock is flat
         siftStartRef.current = null;
       }
       nonActionableItemsRef.current = (d.non_actionable as string[]) ?? [];
