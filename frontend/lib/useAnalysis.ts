@@ -15,7 +15,6 @@ const FALLBACK_REPORT_MS = 15_000;
 // Must stay in sync with backend agent.py constants
 const SIFT_CHUNK_SIZE = 25;
 const GROQ_CHUNK_SIZE = 30;
-const SIFT_CHUNK_SIZE = 25; // must match backend SIFT_CHUNK_SIZE
 
 type TimingStep = "sift" | "categorization" | "clustering" | "report" | "stella";
 
