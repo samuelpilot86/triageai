@@ -58,15 +58,18 @@ _TIMINGS_FILE = Path("timings.json")
 _MAX_TIMINGS = 3
 
 # Separate history per step: {"categorization": [...], "report": [...]}
+_ALL_STEPS = ["sift", "categorization", "clustering", "report", "stella"]
+
 def _load_timings() -> dict:
+    defaults = {s: [] for s in _ALL_STEPS}
     try:
         data = json.loads(_TIMINGS_FILE.read_text())
         # Migrate old flat list format
         if isinstance(data, list):
-            return {"categorization": data[-_MAX_TIMINGS:], "report": []}
-        return {k: v[-_MAX_TIMINGS:] for k, v in data.items()}
+            return {**defaults, "categorization": data[-_MAX_TIMINGS:]}
+        return {**defaults, **{k: v[-_MAX_TIMINGS:] for k, v in data.items()}}
     except Exception:
-        return {"categorization": [], "report": []}
+        return defaults
 
 _timing_history: dict = _load_timings()
 
