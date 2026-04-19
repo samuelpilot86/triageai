@@ -46,7 +46,7 @@ function StaticSourcePill({ source }: { source: PipelineSource }) {
 }
 
 export default function Home() {
-  const { step, partialItems, appName, nonActionableItemsRef, actionableCountRef, analyzeText, analyzeCsv, analyzeStore, reset, retry } = useAnalysis();
+  const { step, partialItems, appName, nonActionableItemsRef, actionableCountRef, allEstimatesRef, analyzeText, analyzeCsv, analyzeStore, reset, retry } = useAnalysis();
   const resultsRef = useRef<HTMLDivElement>(null);
   const pipelineMetaRef = useRef<{ nFeedbacks?: number; clusterCount?: number; siftedCount?: number }>({});
   const sourceRef = useRef<PipelineSource | undefined>(undefined);
@@ -232,6 +232,7 @@ export default function Home() {
                 }
                 reportFallback={step.type === "done" ? step.result.report_fallback : undefined}
                 source={sourceRef.current}
+                estimates={allEstimatesRef.current}
               />
             </section>
           )}

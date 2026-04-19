@@ -164,12 +164,14 @@ function AgentCard({
   step,
   stat,
   usedFallback,
+  estimatedMs,
 }: {
   agent: AgentDef;
   status: AgentStatus;
   step: AnalysisStep;
   stat?: AgentStat;
   usedFallback?: boolean;
+  estimatedMs?: number;
 }) {
   if (status === "hidden") return null;
 
@@ -226,6 +228,11 @@ function AgentCard({
           </span>
         )}
       </div>
+
+      {/* Estimated duration when waiting */}
+      {isWaiting && estimatedMs && (
+        <p className="mt-2 text-xs text-gray-400">~{Math.round(estimatedMs / 1000)}s</p>
+      )}
 
       {/* Stat when done */}
       {isDone && stat && (
@@ -344,6 +351,7 @@ export default function AgentPipeline({
   reportFallback,
   siftFallback,
   source,
+  estimates,
 }: {
   step: AnalysisStep;
   nFeedbacks?: number;
@@ -353,6 +361,7 @@ export default function AgentPipeline({
   reportFallback?: boolean;
   siftFallback?: boolean;
   source?: PipelineSource;
+  estimates?: Partial<Record<string, number>>;
 }) {
   const statuses = deriveStatuses(step);
 
@@ -400,6 +409,7 @@ export default function AgentPipeline({
                 step={step}
                 stat={stats[agent.id]}
                 usedFallback={fallbacks[agent.id] ?? false}
+                estimatedMs={estimates?.[agent.id]}
               />
               {i < visibleAgents.length - 1 && (
                 <Arrow active={statuses[agent.id] === "done"} />

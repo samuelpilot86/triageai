@@ -140,6 +140,7 @@ export function useAnalysis() {
   const stellaStartRef = useRef<number | null>(null);
   const nFeedbacksRef = useRef<number>(0);
   const lastCallRef = useRef<(() => (() => void) | Promise<() => void>) | null>(null);
+  const allEstimatesRef = useRef<Partial<Record<TimingStep, number>>>({});
 
   const reset = useCallback(() => {
     setStep({ type: "idle" });
@@ -158,6 +159,7 @@ export function useAnalysis() {
     reportStartRef.current = null;
     stellaStartRef.current = null;
     nFeedbacksRef.current = 0;
+    allEstimatesRef.current = {};
   }, []);
 
   const buildResult = useCallback((items: FeedbackItem[]): AnalysisResult => ({
@@ -290,6 +292,15 @@ export function useAnalysis() {
     }
   }, [buildResult]);
 
+  // Pre-fetch all step estimates at analysis launch so they can be shown upfront
+  const prefetchAllEstimates = useCallback(async (n: number) => {
+    const steps: TimingStep[] = ["sift", "categorization", "clustering", "report", "stella"];
+    const results = await Promise.all(steps.map((s) => fetchTimingEstimate(s, n)));
+    const estimates: Partial<Record<TimingStep, number>> = {};
+    steps.forEach((s, i) => { estimates[s] = results[i]; });
+    allEstimatesRef.current = estimates;
+  }, []);
+
   // Sets categorization step with timing estimate, then kicks off SSE
   const startCategorization = useCallback(async (
     n: number,
@@ -306,6 +317,7 @@ export function useAnalysis() {
 
   const analyzeText = useCallback((feedbacks: string[], name?: string) => {
     setAppName(name ?? null);
+    prefetchAllEstimates(feedbacks.length);
     const call = () => startCategorization(feedbacks.length, () =>
       streamEvents(
         `${API_BASE}/api/analyze/text`,
@@ -324,6 +336,7 @@ export function useAnalysis() {
 
   const analyzeCsv = useCallback((file: File) => {
     // CSV: we don't know n upfront, use 50 as estimate placeholder
+    prefetchAllEstimates(50);
     const call = () => startCategorization(50, () => {
       const form = new FormData();
       form.append("file", file);
@@ -340,6 +353,7 @@ export function useAnalysis() {
 
   const analyzeStore = useCallback((app: AppEntry, store: Store, count: number = 100) => {
     setAppName(app.name ?? null);
+    prefetchAllEstimates(count);
     // Store: scraping phase first, categorization estimate set when scraped arrives
     const call = () => {
       setStep({ type: "scraping" });
@@ -378,5 +392,5 @@ export function useAnalysis() {
     if (lastCallRef.current) return lastCallRef.current();
   }, []);
 
-  return { step, partialItems, appName, nonActionableItemsRef, actionableCountRef, analyzeText, analyzeCsv, analyzeStore, reset, retry };
+  return { step, partialItems, appName, nonActionableItemsRef, actionableCountRef, allEstimatesRef, analyzeText, analyzeCsv, analyzeStore, reset, retry };
 }
