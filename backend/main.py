@@ -152,7 +152,7 @@ async def analysis_stream(feedbacks: list[str], app_name: str | None = None) -> 
 
     # 5. Nova
     if actions:
-        yield sse_event("status", {"step": "report", "message": "Generating user story cards…"})
+        yield sse_event("status", {"step": "stella", "message": "Generating user story cards…"})
         try:
             cards, cards_fallback = await agent.generate_user_stories(clusters, actions)
             yield sse_event("user_stories", {"cards": cards, "used_fallback": cards_fallback})
