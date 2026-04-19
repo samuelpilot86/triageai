@@ -166,6 +166,10 @@ export function useAnalysis() {
         const startedAt = Date.now();
         setStep({ type: "clustering", startedAt, estimatedMs: 8_000 });
       }
+      else if (s === "stella") {
+        // Nova is now active — keep it distinct from Penn
+        setStep({ type: "stella", startedAt: Date.now() });
+      }
     } else if (event === "sifted") {
       nonActionableItemsRef.current = (d.non_actionable as string[]) ?? [];
       nFeedbacksRef.current = d.actionable_count as number;
@@ -185,7 +189,7 @@ export function useAnalysis() {
       usedFallbackRef.current = fallback;
       setStep((prev) => prev.type === "categorization" ? { ...prev, usedFallback: fallback } : prev);
     } else if (event === "report") {
-      // Record report timing
+      // Record Penn timing; keep step open — Nova may still run
       if (reportStartRef.current !== null) {
         const elapsed = Date.now() - reportStartRef.current;
         recordTiming("report", elapsed);
@@ -195,12 +199,14 @@ export function useAnalysis() {
         text: d.text as string,
         fallback: d.used_fallback as boolean,
       };
+    } else if (event === "user_stories") {
+      userStoryCardsRef.current = (d.cards as UserStoryCard[]) ?? [];
       setPartialItems((items) => {
         setStep({ type: "done", result: buildResult(items) });
         return items;
       });
-    } else if (event === "user_stories") {
-      userStoryCardsRef.current = (d.cards as UserStoryCard[]) ?? [];
+    } else if (event === "done") {
+      // Final signal from backend — handles the no-actions case where Nova is skipped
       setPartialItems((items) => {
         setStep({ type: "done", result: buildResult(items) });
         return items;

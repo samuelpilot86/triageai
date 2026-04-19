@@ -73,6 +73,7 @@ function deriveStatuses(step: AnalysisStep): Record<string, AgentStatus> {
     : step.type === "categorization" ? "categorization"
     : step.type === "clustering" ? "clustering"
     : step.type === "report" ? "report"
+    : step.type === "stella" ? "stella"
     : null;
 
   const statuses: Record<string, AgentStatus> = {};
@@ -242,6 +243,9 @@ function AgentCard({
         <IrisProgressBar startedAt={step.startedAt} estimatedMs={step.estimatedMs} />
       )}
       {isActive && agent.id === "report" && step.type === "report" && (
+        <IrisProgressBar startedAt={step.startedAt} estimatedMs={step.estimatedMs} />
+      )}
+      {isActive && agent.id === "stella" && step.type === "stella" && (
         <IrisProgressBar startedAt={step.startedAt} estimatedMs={step.estimatedMs} />
       )}
     </div>

@@ -70,6 +70,7 @@ export type AnalysisStep =
   | { type: "categorization"; estimatedMs?: number; startedAt?: number; nFeedbacks?: number; scrapedCount?: number; usedFallback?: boolean }
   | { type: "clustering"; clusterCount?: number; estimatedMs?: number; startedAt?: number }
   | { type: "report"; estimatedMs?: number; startedAt?: number }
+  | { type: "stella"; estimatedMs?: number; startedAt?: number }
   | { type: "done"; result: AnalysisResult }
   | { type: "error"; message: string };
 
