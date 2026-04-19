@@ -2,11 +2,13 @@
 agent.py — Core logic of the product feedback triage agent.
 
 Model routing:
-  - Iris  (categorization) : Groq / Llama 3.3 70B as primary — fast structured JSON,
-                             falls back to Gemini if Groq is unavailable.
-  - Hugo  (report)         : Gemini 2.5 Flash as primary — best free-tier quality
-                             for narrative synthesis, falls back to Groq.
-  - Stella (backlog cards) : Gemini 2.5 Flash as primary, falls back to Groq.
+  - Sift  (pre-filter)     : Cerebras / gpt-oss-120b — fast MoE, minimal output, falls back to Gemini.
+  - Iris  (categorization) : Gemini 3.1 Flash Lite — 250K TPM absorbs parallel chunks, 500 RPD.
+                             Falls back to Groq if Gemini unavailable.
+  - Echo  (clustering)     : Cerebras / gpt-oss-120b — structured JSON, small output, fast.
+  - Penn  (report)         : Cerebras / Qwen 3 235B — MMLU-Redux 93.1, narrative quality, ~2s on Cerebras.
+                             Falls back to Gemini 3.1 Flash Lite, then Mistral, then Groq.
+  - Nova  (sprint cards)   : Cerebras / Qwen 3 235B — same rationale as Penn.
 """
 
 import json
@@ -122,7 +124,9 @@ def _require_content(response, source: str) -> str:
     return content
 
 
-PRIMARY_MODEL = "gemini-2.5-flash-lite"
+IRIS_MODEL = "gemini-3.1-flash-lite-preview"   # Gemini 3.1 Flash Lite: 250K TPM, 500 RPD free
+CEREBRAS_STRUCTURED_MODEL = "gpt-oss-120b"              # Sift, Echo — fast MoE, 5.1B active params
+CEREBRAS_NARRATIVE_MODEL = "qwen-3-235b-a22b-instruct-2507"  # Penn, Nova — MMLU-Redux 93.1
 FALLBACK_MODEL = "llama-3.3-70b-versatile"
 FALLBACK_MODEL_MAX_TOKENS = 32_768  # llama-3.3-70b-versatile hard limit
 
@@ -134,15 +138,14 @@ _TOKENS_OVERHEAD = 512
 # Groq free tier: 12 000 TPM (input + output combined).
 # At ~1 500 tokens of input overhead + 250 per feedback output,
 # max safe feedbacks per call = floor((12000 - 1500) / 250) = 42.
-# Use 25 for a balance between safety margin and number of API calls.
-# 100 feedbacks → 4 chunks of 25 (vs 5 chunks of 20 before).
 GROQ_CHUNK_SIZE = 30
 
 
 class FeedbackTriageAgent:
     """
-    Product feedback triage agent powered by Gemini 2.5 Flash.
-    Automatically falls back to Groq (Llama 3.3 70B) on quota exhaustion.
+    Product feedback triage agent.
+    Primary: Cerebras (Sift/Echo: gpt-oss-120b, Penn/Nova: Qwen 3 235B) + Gemini 3.1 Flash Lite (Iris).
+    Fallbacks: Gemini → Mistral → OpenRouter → Groq.
     """
 
     def __init__(
@@ -151,6 +154,7 @@ class FeedbackTriageAgent:
         groq_api_key: str | None = None,
         openrouter_api_key: str | None = None,
         mistral_api_key: str | None = None,
+        cerebras_api_key: str | None = None,
     ):
         self.client = genai.Client(api_key=api_key)
         self.groq_client = AsyncGroq(api_key=groq_api_key) if groq_api_key else None
@@ -162,6 +166,26 @@ class FeedbackTriageAgent:
             _Mistral(api_key=mistral_api_key)
             if mistral_api_key and _Mistral is not None else None
         )
+        self.cerebras_client = (
+            _AsyncOpenAI(api_key=cerebras_api_key, base_url="https://api.cerebras.ai/v1")
+            if cerebras_api_key and _AsyncOpenAI is not None else None
+        )
+
+    # ------------------------------------------------------------------
+    # Cerebras helper
+    # ------------------------------------------------------------------
+
+    async def _call_cerebras(self, model: str, prompt: str, max_tokens: int = 2500) -> str:
+        """Single Cerebras call. Raises on failure (caller handles fallback)."""
+        if self.cerebras_client is None:
+            raise RuntimeError("Cerebras client not configured")
+        response = await self.cerebras_client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=max_tokens,
+        )
+        return _require_content(response, f"Cerebras/{model}")
 
     # ------------------------------------------------------------------
     # Central LLM call with fallback
@@ -230,19 +254,38 @@ IMPORTANT RULES FOR CORRECTIONS:
 
     async def _call_llm_iris(self, prompt: str, n_feedbacks: int | None = None) -> tuple[str, bool]:
         """
-        Iris call chain: Groq → OpenRouter/Nemotron → Gemini.
-        Returns (text, used_fallback) where used_fallback=True if Groq was unavailable.
+        Iris call chain: Gemini 3.1 Flash Lite → Groq → OpenRouter.
+        Returns (text, used_fallback) where used_fallback=True if Gemini was unavailable.
         """
         import asyncio as _asyncio
 
         n = n_feedbacks or 25
-        # Groq hard limit: 32 768 tokens. Output budget: 250 tokens/feedback + 512 overhead.
         groq_max_tokens = min(FALLBACK_MODEL_MAX_TOKENS, _TOKENS_OVERHEAD + n * _TOKENS_PER_FEEDBACK)
-        # Nemotron free tier: empirically capped around 4096 output tokens.
         nemotron_max_tokens = min(4096, groq_max_tokens)
         errors: list[str] = []
 
-        # 1. Groq (llama-3.3-70b-versatile) — fastest, structured JSON
+        # 1. Gemini 3.1 Flash Lite — 250K TPM absorbs parallel chunks, 500 RPD free tier
+        last_error: Exception | None = None
+        for attempt in range(3):
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=IRIS_MODEL, contents=prompt
+                )
+                return self._extract_text(response), False
+            except Exception as e:
+                last_error = e
+                error_str = str(e)
+                is_retryable = "503" in error_str or "UNAVAILABLE" in error_str or "high demand" in error_str.lower()
+                if is_retryable and attempt < 2:
+                    await _asyncio.sleep(2 ** attempt)
+                    continue
+                is_quota = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower()
+                if is_quota:
+                    errors.append(f"Gemini: {error_str[:150]}")
+                    break
+                raise
+
+        # 2. Groq (llama-3.3-70b-versatile) — fallback
         if self.groq_client:
             try:
                 response = await self.groq_client.chat.completions.create(
@@ -251,11 +294,11 @@ IMPORTANT RULES FOR CORRECTIONS:
                     temperature=0.2,
                     max_tokens=groq_max_tokens,
                 )
-                return _require_content(response, "Groq"), False
+                return _require_content(response, "Groq"), True
             except Exception as e:
                 errors.append(f"Groq: {e}")
 
-        # 2. OpenRouter Nemotron 120B — NVIDIA infra, independent quota. 45s timeout.
+        # 3. OpenRouter — last resort
         if self.openrouter_client:
             try:
                 response = await _asyncio.wait_for(
@@ -271,30 +314,10 @@ IMPORTANT RULES FOR CORRECTIONS:
             except Exception as e:
                 errors.append(f"OpenRouter: {type(e).__name__}: {e}")
 
-        # 3. Gemini — last resort, with retries on 503
-        last_error: Exception | None = None
-        for attempt in range(3):
-            try:
-                response = await self.client.aio.models.generate_content(
-                    model=PRIMARY_MODEL, contents=prompt
-                )
-                return self._extract_text(response), True
-            except Exception as e:
-                last_error = e
-                error_str = str(e)
-                is_retryable = "503" in error_str or "UNAVAILABLE" in error_str or "high demand" in error_str.lower()
-                if is_retryable and attempt < 2:
-                    await _asyncio.sleep(2 ** attempt)
-                    continue
-                is_quota = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower()
-                if is_quota:
-                    errors.append(f"Gemini: {error_str[:150]}")
-                    raise RuntimeError(
-                        "All Iris models exhausted (Groq → OpenRouter → Gemini). "
-                        "Try again in a few minutes. Details: " + " | ".join(errors)
-                    ) from e
-                raise
-        raise last_error  # type: ignore[misc]
+        raise RuntimeError(
+            "All Iris models exhausted (Gemini → Groq → OpenRouter). "
+            "Try again in a few minutes. Details: " + " | ".join(errors)
+        )
 
     async def _categorize_chunked(
         self, feedbacks: list[str], chunk_size: int
@@ -336,11 +359,13 @@ IMPORTANT RULES FOR CORRECTIONS:
 
         return all_items, all_corrections, any_fallback
 
-    async def _call_llm(self, prompt: str, max_tokens: int = 2500) -> tuple[str, bool]:
+    async def _call_llm(
+        self, prompt: str, max_tokens: int = 2500, cerebras_model: str = CEREBRAS_NARRATIVE_MODEL
+    ) -> tuple[str, bool]:
         """
-        Penn/Nova call chain: Gemini → Mistral → OpenRouter/Nemotron → Groq.
-        Returns (response_text, used_fallback). used_fallback=True if Gemini was unavailable.
-        max_tokens: explicit budget (2500 for report, 3000 for user stories).
+        General call chain: Cerebras → Gemini 3.1 Flash Lite → Mistral → OpenRouter → Groq.
+        cerebras_model: which Cerebras model to use (narrative vs structured).
+        Returns (response_text, used_fallback). used_fallback=True if Cerebras was unavailable.
         """
         import asyncio as _asyncio
 
@@ -350,18 +375,26 @@ IMPORTANT RULES FOR CORRECTIONS:
         def _is_quota(error_str: str) -> bool:
             return "429" in error_str or "RESOURCE_EXHAUSTED" in error_str
 
-        gemini_error = "skipped"
         fallback_errors: list[str] = []
+        groq_max_tokens = min(FALLBACK_MODEL_MAX_TOKENS, max_tokens)
+        nemotron_max_tokens = min(4096, max_tokens)
 
-        # 1. Gemini 2.5 Flash Lite — best quality for narrative synthesis, generous free tier
+        # 1. Cerebras — fastest inference, generous free tier (1M TPD, 14.4K RPD)
+        if self.cerebras_client:
+            try:
+                return await self._call_cerebras(cerebras_model, prompt, max_tokens), False
+            except Exception as e:
+                fallback_errors.append(f"Cerebras: {e}")
+
+        # 2. Gemini 3.1 Flash Lite — 500 RPD, good quality
         last_error = None
         for attempt in range(3):
             try:
                 response = await self.client.aio.models.generate_content(
-                    model=PRIMARY_MODEL,
+                    model=IRIS_MODEL,
                     contents=prompt,
                 )
-                return self._extract_text(response), False
+                return self._extract_text(response), True
             except Exception as e:
                 error_str = str(e)
                 last_error = e
@@ -372,15 +405,9 @@ IMPORTANT RULES FOR CORRECTIONS:
                     break
                 else:
                     raise
-        gemini_error = str(last_error)[:100] if last_error else "unknown"
-        fallback_errors.append(f"Gemini: {gemini_error}")
+        fallback_errors.append(f"Gemini: {str(last_error)[:100] if last_error else 'unknown'}")
 
-        # Groq hard limit applies here too
-        groq_max_tokens = min(FALLBACK_MODEL_MAX_TOKENS, max_tokens)
-        # Nemotron free tier cap
-        nemotron_max_tokens = min(4096, max_tokens)
-
-        # 2. Mistral Small — good for structured reports, separate quota
+        # 3. Mistral Small — separate quota, 2 RPM (slow but available)
         if self.mistral_client:
             try:
                 response = await self.mistral_client.chat.complete_async(
@@ -395,7 +422,7 @@ IMPORTANT RULES FOR CORRECTIONS:
         else:
             fallback_errors.append("Mistral: not configured")
 
-        # 3. OpenRouter Nemotron 120B — NVIDIA infra, 45s timeout
+        # 4. OpenRouter — NVIDIA infra, 45s timeout
         if self.openrouter_client:
             try:
                 response = await _asyncio.wait_for(
@@ -411,7 +438,7 @@ IMPORTANT RULES FOR CORRECTIONS:
             except Exception as e:
                 fallback_errors.append(f"OpenRouter: {type(e).__name__}: {e}")
 
-        # 4. Groq — last resort (may be TPD-exhausted if Iris already used it)
+        # 5. Groq — last resort
         if self.groq_client:
             try:
                 response = await self.groq_client.chat.completions.create(
@@ -425,7 +452,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                 fallback_errors.append(f"Groq: {e}")
 
         raise RuntimeError(
-            "All Penn/Nova models exhausted (Gemini → Mistral → OpenRouter → Groq). "
+            "All models exhausted (Cerebras → Gemini → Mistral → OpenRouter → Groq). "
             "Try again in a few minutes. Details: " + " | ".join(fallback_errors)
         )
 
@@ -436,7 +463,7 @@ IMPORTANT RULES FOR CORRECTIONS:
     async def sift_feedbacks(self, feedbacks: list[str]) -> tuple[list[str], list[str]]:
         """
         Filters feedbacks into actionable and non-actionable.
-        Uses _call_llm (Gemini → Mistral → OpenRouter → Groq).
+        Uses _call_llm with gpt-oss-120b (Cerebras) — fast MoE, minimal output.
         Returns (actionable_texts, non_actionable_texts).
         """
         numbered = "\n".join(f"{i + 1}. {f}" for i, f in enumerate(feedbacks))
@@ -447,7 +474,7 @@ FEEDBACKS:
 
 Return ONLY valid JSON array of integers, e.g.: [1, 3, 5]"""
 
-        text, _ = await self._call_llm(prompt, max_tokens=1000)
+        text, _ = await self._call_llm(prompt, max_tokens=1000, cerebras_model=CEREBRAS_STRUCTURED_MODEL)
         # Parse the JSON array
         try:
             clean = re.sub(r"```(?:json)?\s*\n?", "", text)
@@ -493,7 +520,7 @@ YOUR RESPONSE MUST START WITH [ AND CONTAIN ONLY A VALID JSON ARRAY. No explanat
   }}
 ]"""
 
-        text, _ = await self._call_llm(prompt, max_tokens=2000)
+        text, _ = await self._call_llm(prompt, max_tokens=2000, cerebras_model=CEREBRAS_STRUCTURED_MODEL)
         try:
             # Strip <think> blocks, fences, then find the JSON array
             clean = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)

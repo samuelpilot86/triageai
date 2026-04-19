@@ -98,6 +98,7 @@ def get_agent() -> FeedbackTriageAgent:
         groq_api_key=os.environ.get("GROQ_API_KEY"),
         openrouter_api_key=os.environ.get("OPENROUTER_API_KEY"),
         mistral_api_key=os.environ.get("MISTRAL_API_KEY"),
+        cerebras_api_key=os.environ.get("CEREBRAS_API_KEY"),
     )
 
 
@@ -232,7 +233,7 @@ async def analyze_store(body: dict):
         )
         try:
             if store == "googleplay":
-                feedbacks = await fetch_play_store_reviews(app_entry["id"], count=min(requested, 100))
+                feedbacks = await fetch_play_store_reviews(app_entry["id"], count=min(requested, 200))
                 source = "Google Play"
             else:
                 feedbacks = await fetch_app_store_reviews(app_entry["id"], count=min(requested, 50))
@@ -259,7 +260,7 @@ async def analyze_store(body: dict):
 
         yield sse_event("scraped", {"count": len(feedbacks), "source": source})
 
-        async for chunk in analysis_stream(feedbacks[:100], app_name=app_entry.get("name")):
+        async for chunk in analysis_stream(feedbacks[:200], app_name=app_entry.get("name")):
             yield chunk
 
     return StreamingResponse(stream(), media_type="text/event-stream", headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
