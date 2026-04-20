@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Resend } from "resend";
 
 export async function POST(req: NextRequest) {
   const { name, email, message } = await req.json();
@@ -7,26 +8,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "All fields are required." }, { status: 400 });
   }
 
-  const accessKey = process.env.WEB3FORMS_KEY;
-  if (!accessKey) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
     return NextResponse.json({ error: "Contact not configured." }, { status: 503 });
   }
 
-  // Web3Forms — access_key is public by design (whitelist-based)
-  const res = await fetch("https://api.web3forms.com/submit", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      access_key: accessKey,
-      name,
-      email,
-      message,
-      subject: `trIAge contact from ${name}`,
-    }),
+  const resend = new Resend(apiKey);
+
+  const { error } = await resend.emails.send({
+    from: "trIAge Contact <onboarding@resend.dev>",
+    to: "samuelpilotbasse@gmail.com",
+    reply_to: email,
+    subject: `trIAge — message from ${name}`,
+    text: `Name: ${name}\nEmail: ${email}\n\n${message}`,
   });
 
-  const data = await res.json();
-  if (!data.success) {
+  if (error) {
     return NextResponse.json({ error: "Failed to send message." }, { status: 500 });
   }
 
