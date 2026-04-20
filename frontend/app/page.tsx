@@ -10,6 +10,7 @@ import AgentPipeline, { PipelineSource } from "@/components/AgentPipeline";
 import { useAnalysis } from "@/lib/useAnalysis";
 import { RotateCcw, ClipboardList, FileSpreadsheet } from "lucide-react";
 import { useState } from "react";
+import AppFooter from "@/components/AppFooter";
 
 function StaticSourcePill({ source }: { source: PipelineSource }) {
   const base = "w-9 h-9 rounded-full flex items-center justify-center shrink-0 border border-gray-200 bg-white shadow-sm transition-all duration-300";
@@ -290,15 +291,7 @@ export default function Home() {
         </div>
       </main>
 
-      <footer className="border-t border-gray-200 mt-6 py-4">
-        <div className="max-w-4xl mx-auto px-6 flex items-center justify-center gap-3 text-xs text-gray-400">
-          <span>Made by <span className="font-medium text-gray-500">Samuel PILOT</span></span>
-          <span>·</span>
-          <a href="https://linktr.ee/samuelpilot" target="_blank" rel="noopener noreferrer" className="hover:text-indigo-500 transition-colors">🌳 LinkTree</a>
-          <span>·</span>
-          <a href="mailto:samuelpilotbasse@gmail.com" className="hover:text-indigo-500 transition-colors">✉️ Contact</a>
-        </div>
-      </footer>
+      <AppFooter />
     </div>
   );
 }

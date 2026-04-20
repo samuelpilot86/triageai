@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import AppFooter from "@/components/AppFooter";
 
 // ── Data ────────────────────────────────────────────────────────────
 
@@ -380,7 +381,7 @@ export default function AboutPage() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition-colors"
                 >
-                  <PortfolioIcon />
+                  <LinktreeIcon />
                   Portfolio
                 </a>
                 <a
@@ -417,21 +418,7 @@ export default function AboutPage() {
 
       </main>
 
-      <footer className="border-t border-gray-100 mt-6 py-4">
-        <div className="max-w-3xl mx-auto px-6 flex items-center justify-center gap-3 text-xs text-gray-400">
-          <span>Made by <span className="font-medium text-gray-500">Samuel PILOT</span></span>
-          <span>·</span>
-          <a href="https://linktr.ee/samuelpilot" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-indigo-500 transition-colors">
-            <PortfolioIcon size={12} />
-            Portfolio
-          </a>
-          <span>·</span>
-          <a href="https://www.linkedin.com/in/samuelpilot" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-sky-500 transition-colors">
-            <LinkedInIcon size={12} />
-            LinkedIn
-          </a>
-        </div>
-      </footer>
+      <AppFooter />
     </div>
   );
 }
@@ -529,11 +516,10 @@ function AgentArrow() {
 
 // ── Social icons ────────────────────────────────────────────────────
 
-function PortfolioIcon({ size = 14 }: { size?: number }) {
+function LinktreeIcon({ size = 14 }: { size?: number }) {
   return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
-      <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
-      <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="m13.73635 5.85251 4.00467-4.11665 2.3248 2.3808-4.20064 4.00466h5.9085v3.30473h-5.9365l4.22865 4.10766-2.3248 2.3338L12.0005 12.099l-5.74052 5.76852-2.3248-2.3248 4.22864-4.10766h-5.9375V8.12132h5.9085L3.93417 4.11666l2.3248-2.3808 4.00468 4.11665V0h3.4727zm-3.4727 10.30614h3.4727V24h-3.4727z"/>
     </svg>
   );
 }
