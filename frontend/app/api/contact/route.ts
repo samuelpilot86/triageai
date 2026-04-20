@@ -18,13 +18,14 @@ export async function POST(req: NextRequest) {
   const { error } = await resend.emails.send({
     from: "trIAge Contact <onboarding@resend.dev>",
     to: "samuelpilotbasse@gmail.com",
-    replyTo: email,
+    reply_to: email,
     subject: `trIAge — message from ${name}`,
     text: `Name: ${name}\nEmail: ${email}\n\n${message}`,
   });
 
   if (error) {
-    return NextResponse.json({ error: "Failed to send message." }, { status: 500 });
+    console.error("Resend error:", JSON.stringify(error));
+    return NextResponse.json({ error: String((error as any).message ?? error) }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

@@ -36,6 +36,7 @@ export function ContactModal({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,9 +47,15 @@ export function ContactModal({ onClose }: { onClose: () => void }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, message }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setErrorMsg(data.error ?? `Error ${res.status}`);
+        setStatus("error");
+        return;
+      }
       setStatus("sent");
-    } catch {
+    } catch (err) {
+      setErrorMsg(String(err));
       setStatus("error");
     }
   }
@@ -108,7 +115,7 @@ export function ContactModal({ onClose }: { onClose: () => void }) {
                 {status === "sending" ? "Sending…" : "Send →"}
               </button>
               {status === "error" && (
-                <span className="text-xs text-red-500">Something went wrong — try again.</span>
+                <span className="text-xs text-red-500">{errorMsg || "Something went wrong — try again."}</span>
               )}
             </div>
           </form>
