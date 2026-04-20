@@ -1,11 +1,7 @@
-import type { Metadata } from "next";
-import Link from "next/link";
+"use client";
 
-export const metadata: Metadata = {
-  title: "trIAge — How it's built",
-  description:
-    "Architecture, model routing, and integration decisions behind trIAge.",
-};
+import { useState } from "react";
+import Link from "next/link";
 
 // ── Data ────────────────────────────────────────────────────────────
 
@@ -362,18 +358,22 @@ export default function AboutPage() {
         <section>
           <SectionLabel>Maker</SectionLabel>
           <div className="rounded-2xl border border-gray-200 bg-white p-6 flex flex-col sm:flex-row items-start gap-6">
+            {/* Photo */}
             <div className="shrink-0">
-              <div className="w-16 h-16 rounded-2xl bg-indigo-100 flex items-center justify-center text-3xl select-none">
-                👤
-              </div>
+              <img
+                src="/samuel.jpg"
+                alt="Samuel PILOT"
+                className="w-20 h-20 rounded-2xl object-cover object-top"
+              />
             </div>
+
             <div className="flex-1 min-w-0">
               <h3 className="text-lg font-bold text-gray-900 mb-1">Samuel PILOT</h3>
               <p className="text-sm text-gray-500 leading-relaxed mb-4">
                 Product Manager and Builder with a Product Owner (BearingPoint) and engineering (Mines Paris) background.
                 trIAge was designed as a concrete demonstration of agentic AI engineering applied to a real PM workflow.
               </p>
-              <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap mb-6">
                 <a
                   href="https://linktr.ee/samuelpilot"
                   target="_blank"
@@ -392,13 +392,10 @@ export default function AboutPage() {
                   <LinkedInIcon />
                   LinkedIn
                 </a>
-                <a
-                  href="mailto:samuelpilotbasse@gmail.com"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition-colors"
-                >
-                  ✉️ Contact
-                </a>
               </div>
+
+              {/* Contact form */}
+              <ContactForm />
             </div>
           </div>
         </section>
@@ -433,8 +430,6 @@ export default function AboutPage() {
             <LinkedInIcon size={12} />
             LinkedIn
           </a>
-          <span>·</span>
-          <a href="mailto:samuelpilotbasse@gmail.com" className="hover:text-indigo-500 transition-colors">✉️ Contact</a>
         </div>
       </footer>
     </div>
@@ -548,6 +543,84 @@ function LinkedInIcon({ size = 14 }: { size?: number }) {
     <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" xmlns="http://www.w3.org/2000/svg">
       <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
     </svg>
+  );
+}
+
+// ── Contact form ─────────────────────────────────────────────────────
+
+function ContactForm() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setStatus("sending");
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, message }),
+      });
+      if (!res.ok) throw new Error();
+      setStatus("sent");
+      setName(""); setEmail(""); setMessage("");
+    } catch {
+      setStatus("error");
+    }
+  }
+
+  if (status === "sent") {
+    return (
+      <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700 font-medium">
+        ✓ Message sent — I&apos;ll get back to you shortly.
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Send a message</p>
+      <div className="grid grid-cols-2 gap-3">
+        <input
+          type="text"
+          placeholder="Your name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          className="px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-gray-400"
+        />
+        <input
+          type="email"
+          placeholder="Your email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          className="px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-gray-400"
+        />
+      </div>
+      <textarea
+        placeholder="Your message"
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        required
+        rows={3}
+        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-gray-400 resize-none"
+      />
+      <div className="flex items-center gap-3">
+        <button
+          type="submit"
+          disabled={status === "sending"}
+          className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
+        >
+          {status === "sending" ? "Sending…" : "Send →"}
+        </button>
+        {status === "error" && (
+          <span className="text-xs text-red-500">Something went wrong — try again.</span>
+        )}
+      </div>
+    </form>
   );
 }
 
