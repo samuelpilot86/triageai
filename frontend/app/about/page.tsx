@@ -359,12 +359,12 @@ export default function AboutPage() {
         <section>
           <SectionLabel>Maker</SectionLabel>
           <div className="rounded-2xl border border-gray-200 bg-white p-6 flex flex-col sm:flex-row items-start gap-6">
-            {/* Photo */}
+          jsx{/* Photo */}
             <div className="shrink-0">
               <img
                 src="/samuel.jpg"
                 alt="Samuel PILOT"
-                className="w-20 h-20 rounded-2xl object-cover object-top"
+                className="w-24 h-auto rounded-2xl object-contain"
               />
             </div>
 
