@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import AppFooter from "@/components/AppFooter";
+import AppFooter, { ContactModal } from "@/components/AppFooter";
 
 // ── Data ────────────────────────────────────────────────────────────
 
@@ -133,6 +133,7 @@ const STACK_CATEGORIES = [
 // ── Page ────────────────────────────────────────────────────────────
 
 export default function AboutPage() {
+  const [showContact, setShowContact] = useState(false);
   return (
     <div className="min-h-screen bg-gray-50">
 
@@ -359,7 +360,7 @@ export default function AboutPage() {
         <section>
           <SectionLabel>Maker</SectionLabel>
           <div className="rounded-2xl border border-gray-200 bg-white p-6 flex flex-col sm:flex-row items-start gap-6">
-          jsx{/* Photo */}
+          {/* Photo */}
             <div className="shrink-0">
               <img
                 src="/samuel.jpg"
@@ -374,7 +375,7 @@ export default function AboutPage() {
                 Product Manager and Builder with a Product Owner (BearingPoint) and engineering (Mines Paris) background.
                 trIAge was designed as a concrete demonstration of agentic AI engineering applied to a real PM workflow.
               </p>
-              <div className="flex items-center gap-3 flex-wrap mb-6">
+              <div className="flex items-center gap-3 flex-wrap">
                 <a
                   href="https://linktr.ee/samuelpilot"
                   target="_blank"
@@ -393,10 +394,14 @@ export default function AboutPage() {
                   <LinkedInIcon />
                   LinkedIn
                 </a>
+                <button
+                  onClick={() => setShowContact(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-100 transition-colors"
+                >
+                  <MailIcon />
+                  Contact
+                </button>
               </div>
-
-              {/* Contact form */}
-              <ContactForm />
             </div>
           </div>
         </section>
@@ -419,6 +424,7 @@ export default function AboutPage() {
       </main>
 
       <AppFooter />
+      {showContact && <ContactModal onClose={() => setShowContact(false)} />}
     </div>
   );
 }
@@ -532,81 +538,12 @@ function LinkedInIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-// ── Contact form ─────────────────────────────────────────────────────
-
-function ContactForm() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setStatus("sending");
-    try {
-      const res = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, message }),
-      });
-      if (!res.ok) throw new Error();
-      setStatus("sent");
-      setName(""); setEmail(""); setMessage("");
-    } catch {
-      setStatus("error");
-    }
-  }
-
-  if (status === "sent") {
-    return (
-      <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700 font-medium">
-        ✓ Message sent — I&apos;ll get back to you shortly.
-      </div>
-    );
-  }
-
+function MailIcon({ size = 13 }: { size?: number }) {
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Send a message</p>
-      <div className="grid grid-cols-2 gap-3">
-        <input
-          type="text"
-          placeholder="Your name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-          className="px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-gray-400"
-        />
-        <input
-          type="email"
-          placeholder="Your email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-gray-400"
-        />
-      </div>
-      <textarea
-        placeholder="Your message"
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        required
-        rows={3}
-        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-gray-400 resize-none"
-      />
-      <div className="flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={status === "sending"}
-          className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors"
-        >
-          {status === "sending" ? "Sending…" : "Send →"}
-        </button>
-        {status === "error" && (
-          <span className="text-xs text-red-500">Something went wrong — try again.</span>
-        )}
-      </div>
-    </form>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <polyline points="2,4 12,13 22,4" />
+    </svg>
   );
 }
 

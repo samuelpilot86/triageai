@@ -31,7 +31,7 @@ function MailIcon({ size = 13 }: { size?: number }) {
 
 // ── Contact modal ──────────────────────────────────────────────────
 
-function ContactModal({ onClose }: { onClose: () => void }) {
+export function ContactModal({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
