@@ -6,9 +6,9 @@ Model routing:
   - Iris  (categorization) : Gemini 3.1 Flash Lite — 250K TPM absorbs parallel chunks, 500 RPD.
                              Falls back to Groq if Gemini unavailable.
   - Echo  (clustering)     : Cerebras / gpt-oss-120b — structured JSON, small output, fast.
-  - Penn  (report)         : Cerebras / Qwen 3 235B — MMLU-Redux 93.1, narrative quality, ~2s on Cerebras.
+  - Penn  (report)         : Cerebras / Qwen 3 32B — 1M TPD free, 2400 tok/s; replaces retired Qwen 235B.
                              Falls back to Gemini 3.1 Flash Lite, then Mistral, then Groq.
-  - Nova  (sprint cards)   : Cerebras / Qwen 3 235B — same rationale as Penn.
+  - Nova  (sprint cards)   : Cerebras / Qwen 3 32B — same rationale as Penn.
 """
 
 import asyncio
@@ -127,7 +127,7 @@ def _require_content(response, source: str) -> str:
 
 IRIS_MODEL = "gemini-3.1-flash-lite-preview"   # Gemini 3.1 Flash Lite: 250K TPM, 500 RPD free
 CEREBRAS_STRUCTURED_MODEL = "gpt-oss-120b"              # Sift, Echo — fast MoE, 5.1B active params
-CEREBRAS_NARRATIVE_MODEL = "qwen-3-235b-a22b-instruct-2507"  # Penn, Nova — MMLU-Redux 93.1
+CEREBRAS_NARRATIVE_MODEL = "qwen-3-32b"  # Penn, Nova — replaces retired Qwen 235B (May 27 2026); 1M TPD free, 2400 tok/s
 FALLBACK_MODEL = "llama-3.3-70b-versatile"
 FALLBACK_MODEL_MAX_TOKENS = 32_768  # llama-3.3-70b-versatile hard limit
 
