@@ -35,17 +35,17 @@ const AGENTS = [
     emoji: "🖊️",
     name: "Penn",
     role: "Reporter",
-    model: "Cerebras · Qwen 3 235B",
+    model: "Gemini 3.1 Flash Lite",
     desc: "Synthesizes top clusters into a PM executive report with prioritized recommendations",
-    modelClass: "cerebras",
+    modelClass: "gemini",
   },
   {
     emoji: "🃏",
     name: "Nova",
     role: "Backlog Builder",
-    model: "Cerebras · Qwen 3 235B",
+    model: "Gemini 3.1 Flash Lite",
     desc: "Generates RICE-scored sprint cards with US and acceptance criteria, ready for Jira",
-    modelClass: "cerebras",
+    modelClass: "gemini",
   },
 ];
 
@@ -74,16 +74,16 @@ const MODEL_ROUTING = [
   {
     agent: "Penn",
     emoji: "🖊️",
-    badge: "Cerebras · Qwen 3 235B",
-    badgeClass: "bg-rose-100 text-rose-800",
-    why: "Narrative synthesis for a stakeholder-facing report. Qwen 3 235B performs close to Opus 4 ; Cerebras serves it at ~2000 tok/s so a rich report still renders in seconds.",
+    badge: "Gemini 3.1 Flash Lite",
+    badgeClass: "bg-indigo-100 text-indigo-800",
+    why: "Narrative synthesis for a stakeholder-facing report calls for fluent, structured prose — Gemini 3.1 Flash Lite consistently produces well-argued, PM-ready summaries. Its generous daily quota means report generation is never the bottleneck.",
   },
   {
     agent: "Nova",
     emoji: "🃏",
-    badge: "Cerebras · Qwen 3 235B",
-    badgeClass: "bg-rose-100 text-rose-800",
-    why: "RICE scoring, user story format, acceptance criteria — requires PM domain understanding and structured output. Same reasoning muscle as Penn, same throughput budget, same free-tier pool.",
+    badge: "Gemini 3.1 Flash Lite",
+    badgeClass: "bg-indigo-100 text-indigo-800",
+    why: "RICE scoring, user story format and acceptance criteria require PM domain understanding and disciplined structured output. Gemini 3.1 Flash Lite handles both the reasoning and the formatting with enough headroom for repeated runs.",
   },
 ];
 
@@ -122,7 +122,7 @@ const STACK_CATEGORIES = [
   },
   {
     label: "AI Models",
-    items: ["Cerebras · gpt-oss-120b", "Cerebras · Qwen 3 235B", "Gemini 3.1 Flash Lite"],
+    items: ["Cerebras · gpt-oss-120b", "Gemini 3.1 Flash Lite", "Cerebras · GLM 4.7 (fallback)"],
   },
   {
     label: "Integrations",
@@ -238,8 +238,8 @@ export default function AboutPage() {
             Each step is routed to the provider whose model quality and capabilities, throughput and free-tier limits best match its workload.
           </p>
           <ul className="text-sm text-gray-500 mb-6 space-y-1 pl-4">
-            <li className="list-disc leading-relaxed">Cerebras handles the heavy reasoning at wafer-scale speed.</li>
-            <li className="list-disc leading-relaxed">Gemini absorbs the parallel fan-out of the categorization step.</li>
+            <li className="list-disc leading-relaxed">Cerebras handles the fast filtering and clustering steps, leveraging its high-throughput inference.</li>
+            <li className="list-disc leading-relaxed">Gemini 3.1 Flash Lite drives all generation steps — categorization, report and sprint cards — combining strong reasoning with reliable availability.</li>
           </ul>
 
           <div className="rounded-xl border border-gray-200 overflow-hidden">
