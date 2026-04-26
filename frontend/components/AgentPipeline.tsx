@@ -44,14 +44,14 @@ const AGENTS: AgentDef[] = [
     name: "Penn",
     role: "Reporter",
     emoji: "🖊️",
-    model: "Cerebras · Qwen 3 235B",
+    model: "Cerebras · GLM 4.7",
   },
   {
     id: "stella",
     name: "Nova",
     role: "Story Writer",
     emoji: "🃏",
-    model: "Cerebras · Qwen 3 235B",
+    model: "Cerebras · GLM 4.7",
   },
 ];
 
@@ -154,8 +154,8 @@ const FALLBACK_CHAINS: Record<string, string> = {
   sift: "Cerebras · gpt-oss-120b → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
   categorization: "Gemini 3.1 Flash Lite → Groq · Llama 3.3 70B → OpenRouter · auto",
   clustering: "Cerebras · gpt-oss-120b → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
-  report: "Cerebras · Qwen 3 32B → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
-  stella: "Cerebras · Qwen 3 32B → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
+  report: "Cerebras · GLM 4.7 → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
+  stella: "Cerebras · GLM 4.7 → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
 };
 
 function AgentCard({
