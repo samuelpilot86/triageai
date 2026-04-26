@@ -6,9 +6,9 @@ Model routing:
   - Iris  (categorization) : Gemini 3.1 Flash Lite — 250K TPM absorbs parallel chunks, 500 RPD.
                              Falls back to Groq if Gemini unavailable.
   - Echo  (clustering)     : Cerebras / gpt-oss-120b — structured JSON, small output, fast.
-  - Penn  (report)         : Cerebras / GLM 4.7 — only large model available post-Qwen retirement; 100 RPD free.
-                             Falls back to Gemini 3.1 Flash Lite, then Mistral, then Groq.
-  - Nova  (sprint cards)   : Cerebras / GLM 4.7 — same rationale as Penn.
+  - Penn  (report)         : Gemini 3.1 Flash Lite — reliable primary; Cerebras GLM 4.7 as fallback.
+                             Falls back to Cerebras GLM 4.7, then Mistral, then Groq.
+  - Nova  (sprint cards)   : Gemini 3.1 Flash Lite — same rationale as Penn.
 """
 
 import asyncio
@@ -365,10 +365,10 @@ IMPORTANT RULES FOR CORRECTIONS:
         self, prompt: str, max_tokens: int = 2500, cerebras_model: str = CEREBRAS_NARRATIVE_MODEL
     ) -> tuple[str, bool]:
         """
-        General call chain: Cerebras → Gemini 3.1 Flash Lite → Mistral → OpenRouter → Groq.
-        cerebras_model: which Cerebras model to use (narrative vs structured).
-        Returns (response_text, fallback_provider). fallback_provider is None if Cerebras succeeded,
-        or a string like "Gemini", "Groq", etc. identifying which fallback was used.
+        General call chain: Gemini 3.1 Flash Lite → Cerebras (GLM 4.7) → Mistral → OpenRouter → Groq.
+        Gemini is primary for Penn/Nova (Cerebras GLM 4.7 access unreliable on free tier).
+        Returns (response_text, fallback_provider). fallback_provider is None if Gemini succeeded,
+        or a string like "Cerebras", "Groq", etc. identifying which fallback was used.
         """
         import asyncio as _asyncio
 
@@ -382,14 +382,7 @@ IMPORTANT RULES FOR CORRECTIONS:
         groq_max_tokens = min(FALLBACK_MODEL_MAX_TOKENS, max_tokens)
         nemotron_max_tokens = min(4096, max_tokens)
 
-        # 1. Cerebras — fastest inference, generous free tier (1M TPD, 14.4K RPD)
-        if self.cerebras_client:
-            try:
-                return await self._call_cerebras(cerebras_model, prompt, max_tokens), None
-            except Exception as e:
-                fallback_errors.append(f"Cerebras: {e}")
-
-        # 2. Gemini 3.1 Flash Lite — 500 RPD, good quality
+        # 1. Gemini 3.1 Flash Lite — primary for Penn/Nova (reliable free tier, 500 RPD)
         last_error = None
         for attempt in range(3):
             try:
@@ -397,7 +390,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                     model=IRIS_MODEL,
                     contents=prompt,
                 )
-                return self._extract_text(response), "Gemini"
+                return self._extract_text(response), None
             except Exception as e:
                 error_str = str(e)
                 last_error = e
@@ -409,6 +402,13 @@ IMPORTANT RULES FOR CORRECTIONS:
                 else:
                     raise
         fallback_errors.append(f"Gemini: {str(last_error)[:100] if last_error else 'unknown'}")
+
+        # 2. Cerebras GLM 4.7 — fast when available (100 RPD free tier)
+        if self.cerebras_client:
+            try:
+                return await self._call_cerebras(cerebras_model, prompt, max_tokens), "Cerebras"
+            except Exception as e:
+                fallback_errors.append(f"Cerebras: {e}")
 
         # 3. Mistral Small — separate quota, 2 RPM (slow but available)
         if self.mistral_client:
@@ -425,7 +425,7 @@ IMPORTANT RULES FOR CORRECTIONS:
         else:
             fallback_errors.append("Mistral: not configured")
 
-        # 4. OpenRouter — NVIDIA infra, 45s timeout
+        # 4. OpenRouter — last resort before Groq
         if self.openrouter_client:
             try:
                 response = await _asyncio.wait_for(
@@ -455,7 +455,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                 fallback_errors.append(f"Groq: {e}")
 
         raise RuntimeError(
-            "All models exhausted (Cerebras → Gemini → Mistral → OpenRouter → Groq). "
+            "All models exhausted (Gemini → Cerebras → Mistral → OpenRouter → Groq). "
             "Try again in a few minutes. Details: " + " | ".join(fallback_errors)
         )
 
