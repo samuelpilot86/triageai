@@ -59,6 +59,8 @@ export interface AnalysisResult {
   used_fallback: boolean;
   report: string;
   report_fallback: boolean;
+  report_fallback_provider?: string | null;
+  cards_fallback_provider?: string | null;
   user_story_cards: UserStoryCard[];
   non_actionable_items?: string[];
 }

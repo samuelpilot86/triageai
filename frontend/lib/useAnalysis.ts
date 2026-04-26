@@ -128,7 +128,7 @@ export function useAnalysis() {
   const [appName, setAppName] = useState<string | null>(null);
   const correctionsRef = useRef<Correction[]>([]);
   const usedFallbackRef = useRef<boolean>(false);
-  const reportRef = useRef<{ text: string; fallback: boolean } | null>(null);
+  const reportRef = useRef<{ text: string; fallback: boolean; fallback_provider?: string | null } | null>(null);
   const userStoryCardsRef = useRef<UserStoryCard[]>([]);
   const nonActionableItemsRef = useRef<string[]>([]);
   const actionableCountRef = useRef<number | null>(null);
@@ -162,12 +162,16 @@ export function useAnalysis() {
     allEstimatesRef.current = {};
   }, []);
 
+  const cardsProviderRef = useRef<string | null>(null);
+
   const buildResult = useCallback((items: FeedbackItem[]): AnalysisResult => ({
     items,
     corrections: correctionsRef.current,
     used_fallback: usedFallbackRef.current,
     report: reportRef.current?.text ?? "",
     report_fallback: reportRef.current?.fallback ?? false,
+    report_fallback_provider: reportRef.current?.fallback_provider ?? null,
+    cards_fallback_provider: cardsProviderRef.current,
     user_story_cards: userStoryCardsRef.current,
     non_actionable_items: nonActionableItemsRef.current,
   }), []);
@@ -268,6 +272,7 @@ export function useAnalysis() {
       reportRef.current = {
         text: d.text as string,
         fallback: d.used_fallback as boolean,
+        fallback_provider: (d.fallback_provider as string | null) ?? null,
       };
     } else if (event === "user_stories") {
       // Nova finished — record timing
@@ -277,6 +282,7 @@ export function useAnalysis() {
         stellaStartRef.current = null;
       }
       userStoryCardsRef.current = (d.cards as UserStoryCard[]) ?? [];
+      cardsProviderRef.current = (d.fallback_provider as string | null) ?? null;
       setPartialItems((items) => {
         setStep({ type: "done", result: buildResult(items) });
         return items;

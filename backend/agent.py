@@ -367,7 +367,8 @@ IMPORTANT RULES FOR CORRECTIONS:
         """
         General call chain: Cerebras → Gemini 3.1 Flash Lite → Mistral → OpenRouter → Groq.
         cerebras_model: which Cerebras model to use (narrative vs structured).
-        Returns (response_text, used_fallback). used_fallback=True if Cerebras was unavailable.
+        Returns (response_text, fallback_provider). fallback_provider is None if Cerebras succeeded,
+        or a string like "Gemini", "Groq", etc. identifying which fallback was used.
         """
         import asyncio as _asyncio
 
@@ -384,7 +385,7 @@ IMPORTANT RULES FOR CORRECTIONS:
         # 1. Cerebras — fastest inference, generous free tier (1M TPD, 14.4K RPD)
         if self.cerebras_client:
             try:
-                return await self._call_cerebras(cerebras_model, prompt, max_tokens), False
+                return await self._call_cerebras(cerebras_model, prompt, max_tokens), None
             except Exception as e:
                 fallback_errors.append(f"Cerebras: {e}")
 
@@ -396,7 +397,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                     model=IRIS_MODEL,
                     contents=prompt,
                 )
-                return self._extract_text(response), True
+                return self._extract_text(response), "Gemini"
             except Exception as e:
                 error_str = str(e)
                 last_error = e
@@ -418,7 +419,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                     temperature=0.2,
                     max_tokens=max_tokens,
                 )
-                return _require_content(response, "Mistral"), True
+                return _require_content(response, "Mistral"), "Mistral"
             except Exception as e:
                 fallback_errors.append(f"Mistral: {e}")
         else:
@@ -436,7 +437,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                     ),
                     timeout=90,
                 )
-                return _require_content(response, "OpenRouter/auto"), True
+                return _require_content(response, "OpenRouter/auto"), "OpenRouter"
             except Exception as e:
                 fallback_errors.append(f"OpenRouter: {type(e).__name__}: {e}")
 
@@ -449,7 +450,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                     temperature=0.2,
                     max_tokens=groq_max_tokens,
                 )
-                return _require_content(response, "Groq"), True
+                return _require_content(response, "Groq"), "Groq"
             except Exception as e:
                 fallback_errors.append(f"Groq: {e}")
 
@@ -667,7 +668,7 @@ Rules:
 - Tone: senior product consultant, concise, decision-oriented
 - The "actions" array must contain EXACTLY the bold titles from ## Top 3 Recommended Actions, verbatim"""
 
-        text, used_fallback = await self._call_llm(prompt, max_tokens=2500)
+        text, fallback_provider = await self._call_llm(prompt, max_tokens=2500)
         try:
             # Strip markdown fences and sanitize literal newlines inside JSON strings
             clean = re.sub(r"```(?:json)?\s*\n?", "", text)
@@ -688,7 +689,7 @@ Rules:
                 # Strip fences at minimum so raw JSON isn't shown
                 report_md = re.sub(r"```(?:json)?\s*\n?|\n?```", "", text).strip()
                 actions = []
-        return report_md, actions, used_fallback
+        return report_md, actions, fallback_provider
 
     async def generate_user_stories(
         self, clusters: list[dict], actions: list[str]
@@ -796,7 +797,7 @@ Return ONLY a valid JSON array, no markdown, no surrounding text:
   }}
 ]"""
 
-        text, used_fallback = await self._call_llm(prompt, max_tokens=3000)
+        text, fallback_provider = await self._call_llm(prompt, max_tokens=3000)
         try:
             clean = re.sub(r"```(?:json)?\s*\n?", "", text)
             clean = re.sub(r"\n?```", "", clean).strip()
@@ -816,7 +817,7 @@ Return ONLY a valid JSON array, no markdown, no surrounding text:
         except Exception as e:
             print(f"[generate_user_stories] parse error: {e}\nRaw output: {text[:500]}")
             cards = []
-        return cards, used_fallback
+        return cards, fallback_provider
 
     # ------------------------------------------------------------------
     # Utilities

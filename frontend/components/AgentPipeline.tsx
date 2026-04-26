@@ -154,8 +154,8 @@ const FALLBACK_CHAINS: Record<string, string> = {
   sift: "Cerebras · gpt-oss-120b → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
   categorization: "Gemini 3.1 Flash Lite → Groq · Llama 3.3 70B → OpenRouter · auto",
   clustering: "Cerebras · gpt-oss-120b → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
-  report: "Cerebras · Qwen 3 235B → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
-  stella: "Cerebras · Qwen 3 235B → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
+  report: "Cerebras · Qwen 3 32B → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
+  stella: "Cerebras · Qwen 3 32B → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
 };
 
 function AgentCard({
@@ -164,6 +164,7 @@ function AgentCard({
   step,
   stat,
   usedFallback,
+  fallbackProvider,
   estimatedMs,
 }: {
   agent: AgentDef;
@@ -171,6 +172,7 @@ function AgentCard({
   step: AnalysisStep;
   stat?: AgentStat;
   usedFallback?: boolean;
+  fallbackProvider?: string | null;
   estimatedMs?: number;
 }) {
   if (status === "hidden") return null;
@@ -221,10 +223,12 @@ function AgentCard({
         </span>
         {usedFallback && FALLBACK_CHAINS[agent.id] && (
           <span
-            title={`Fallback chain: ${FALLBACK_CHAINS[agent.id]}`}
+            title={fallbackProvider
+              ? `Used: ${fallbackProvider} (Cerebras unavailable)`
+              : `Fallback chain: ${FALLBACK_CHAINS[agent.id]}`}
             className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium bg-orange-100 text-orange-600 cursor-help"
           >
-            ↩ fallback
+            ↩ {fallbackProvider ?? "fallback"}
           </span>
         )}
       </div>
@@ -349,6 +353,8 @@ export default function AgentPipeline({
   siftedCount,
   irisFallback,
   reportFallback,
+  reportFallbackProvider,
+  cardsFallbackProvider,
   siftFallback,
   source,
   estimates,
@@ -359,6 +365,8 @@ export default function AgentPipeline({
   siftedCount?: number;
   irisFallback?: boolean;
   reportFallback?: boolean;
+  reportFallbackProvider?: string | null;
+  cardsFallbackProvider?: string | null;
   siftFallback?: boolean;
   source?: PipelineSource;
   estimates?: Partial<Record<string, number>>;
@@ -380,7 +388,14 @@ export default function AgentPipeline({
     sift: siftFallback ?? false,
     categorization: irisFallback ?? false,
     report: reportFallback ?? false,
-    stella: reportFallback ?? false,
+    stella: cardsFallbackProvider != null ? true : (reportFallback ?? false),
+  };
+
+  const fallbackProviders: Record<string, string | null> = {
+    sift: null,
+    categorization: null,
+    report: reportFallbackProvider ?? null,
+    stella: cardsFallbackProvider ?? null,
   };
 
   const visibleAgents = AGENTS.filter((a) => statuses[a.id] !== "hidden");
@@ -409,6 +424,7 @@ export default function AgentPipeline({
                 step={step}
                 stat={stats[agent.id]}
                 usedFallback={fallbacks[agent.id] ?? false}
+                fallbackProvider={fallbackProviders[agent.id]}
                 estimatedMs={estimates?.[agent.id]}
               />
               {i < visibleAgents.length - 1 && (

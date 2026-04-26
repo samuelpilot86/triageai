@@ -151,14 +151,14 @@ async def analysis_stream(feedbacks: list[str], app_name: str | None = None) -> 
     except Exception as e:
         yield sse_event("error", {"message": str(e)})
         return
-    yield sse_event("report", {"text": report, "used_fallback": report_fallback})
+    yield sse_event("report", {"text": report, "used_fallback": report_fallback is not None, "fallback_provider": report_fallback})
 
     # 5. Nova
     if actions:
         yield sse_event("status", {"step": "stella", "message": "Generating user story cards…"})
         try:
             cards, cards_fallback = await agent.generate_user_stories(clusters, actions)
-            yield sse_event("user_stories", {"cards": cards, "used_fallback": cards_fallback})
+            yield sse_event("user_stories", {"cards": cards, "used_fallback": cards_fallback is not None, "fallback_provider": cards_fallback})
         except Exception:
             pass
 

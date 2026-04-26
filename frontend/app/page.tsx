@@ -158,6 +158,8 @@ disabled={isRunning}
                   undefined
                 }
                 reportFallback={step.type === "done" ? step.result.report_fallback : undefined}
+                reportFallbackProvider={step.type === "done" ? step.result.report_fallback_provider : undefined}
+                cardsFallbackProvider={step.type === "done" ? step.result.cards_fallback_provider : undefined}
                 source={sourceRef.current}
                 estimates={allEstimatesRef.current}
               />
