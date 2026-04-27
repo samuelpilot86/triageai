@@ -84,10 +84,10 @@ export default function Home() {
         {step.type === "idle" && (
           <section className="space-y-6">
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-gray-900">Turn app reviews into Jira tickets — in seconds</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Turn app reviews into Jira tickets</h2>
               <p className="text-sm text-gray-500">
-                Pull feedbacks directly from the App Store or Google Play reviews, upload a CSV, paste feedback, or use our demo feedback samples.
-                Your AI agents will categorize, prioritize, and turn them into sprint-ready cards.
+                Pull feedbacks directly from the App Store/Google Play reviews or paste your app&apos;s feedbacks.
+                Your AI agents will turn them into sprint-ready Jira tickets.
               </p>
             </div>
 
