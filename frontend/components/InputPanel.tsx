@@ -228,7 +228,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
             className="w-full h-52 px-4 py-3 text-sm rounded-xl border border-gray-200 bg-gray-50 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-500 disabled:opacity-60"
           />
           <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">100 real ChatGPT reviews (Google Play, en-US) — edit to remove some</span>
+            <span className="text-xs text-gray-400">100 real ChatGPT reviews (Google Play, en-US)</span>
             <button
               onClick={() => onAnalyzeText(demoText.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 100), "ChatGPT")}
               disabled={disabled || demoText.split("\n").filter((l) => l.trim()).length < 2}
