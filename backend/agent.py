@@ -254,10 +254,10 @@ IMPORTANT RULES FOR CORRECTIONS:
 - If a field needed no change, do NOT include it in corrections at all.
 - If no fields needed changing, return "corrections": []."""
 
-    async def _call_llm_iris(self, prompt: str, n_feedbacks: int | None = None) -> tuple[str, bool]:
+    async def _call_llm_iris(self, prompt: str, n_feedbacks: int | None = None) -> tuple[str, str | None]:
         """
         Iris call chain: Gemini 3.1 Flash Lite → Groq → OpenRouter.
-        Returns (text, used_fallback) where used_fallback=True if Gemini was unavailable.
+        Returns (text, fallback_provider) — None if Gemini succeeded, provider name otherwise.
         """
         import asyncio as _asyncio
 
@@ -272,7 +272,7 @@ IMPORTANT RULES FOR CORRECTIONS:
             response = await self.client.aio.models.generate_content(
                 model=IRIS_MODEL, contents=prompt
             )
-            return self._extract_text(response), False
+            return self._extract_text(response), None
         except Exception as e:
             last_error = e
             error_str = str(e)
@@ -292,7 +292,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                     temperature=0.2,
                     max_tokens=groq_max_tokens,
                 )
-                return _require_content(response, "Groq"), True
+                return _require_content(response, "Groq"), "Groq"
             except Exception as e:
                 errors.append(f"Groq: {e}")
 
@@ -308,7 +308,7 @@ IMPORTANT RULES FOR CORRECTIONS:
                     ),
                     timeout=90,
                 )
-                return _require_content(response, "OpenRouter/auto"), True
+                return _require_content(response, "OpenRouter/auto"), "OpenRouter"
             except Exception as e:
                 errors.append(f"OpenRouter: {type(e).__name__}: {e}")
 
@@ -319,19 +319,19 @@ IMPORTANT RULES FOR CORRECTIONS:
 
     async def _categorize_chunked(
         self, feedbacks: list[str], chunk_size: int
-    ) -> tuple[list[dict], list[dict], bool]:
+    ) -> tuple[list[dict], list[dict], str | None]:
         """
         Processes feedbacks in chunks (Groq TPM limit = 25/chunk), all chunks in parallel.
-        Returns (items, corrections, used_fallback) — True if any chunk used a fallback.
+        Returns (items, corrections, fallback_provider) — None if Gemini succeeded for all chunks.
         """
         import asyncio as _asyncio
 
         chunks = [feedbacks[i: i + chunk_size] for i in range(0, len(feedbacks), chunk_size)]
         offsets = [i * chunk_size for i in range(len(chunks))]
 
-        async def process_chunk(chunk: list[str], offset: int) -> tuple[list[dict], list[dict], bool]:
+        async def process_chunk(chunk: list[str], offset: int) -> tuple[list[dict], list[dict], str | None]:
             prompt = self._build_categorization_prompt(chunk)
-            text, chunk_fallback = await self._call_llm_iris(prompt, n_feedbacks=len(chunk))
+            text, chunk_provider = await self._call_llm_iris(prompt, n_feedbacks=len(chunk))
             data = self._parse_json_response(text)
             chunk_items = data.get("feedbacks", [])
             chunk_corrections = [
@@ -342,20 +342,20 @@ IMPORTANT RULES FOR CORRECTIONS:
                 item["id"] = offset + item["id"]
             for correction in chunk_corrections:
                 correction["id"] = offset + correction["id"]
-            return chunk_items, chunk_corrections, chunk_fallback
+            return chunk_items, chunk_corrections, chunk_provider
 
         results = await _asyncio.gather(*[process_chunk(chunk, offset) for chunk, offset in zip(chunks, offsets)])
 
         all_items: list[dict] = []
         all_corrections: list[dict] = []
-        any_fallback = False
-        for chunk_items, chunk_corrections, chunk_fallback in results:
+        fallback_provider: str | None = None
+        for chunk_items, chunk_corrections, chunk_provider in results:
             all_items.extend(chunk_items)
             all_corrections.extend(chunk_corrections)
-            if chunk_fallback:
-                any_fallback = True
+            if chunk_provider is not None and fallback_provider is None:
+                fallback_provider = chunk_provider
 
-        return all_items, all_corrections, any_fallback
+        return all_items, all_corrections, fallback_provider
 
     async def _call_llm(
         self, prompt: str, max_tokens: int = 2500, cerebras_model: str = CEREBRAS_NARRATIVE_MODEL
@@ -592,13 +592,13 @@ YOUR RESPONSE MUST START WITH [ AND CONTAIN ONLY A VALID JSON ARRAY. No explanat
 
     async def categorize_and_validate(
         self, feedbacks: list[str]
-    ) -> tuple[list[dict], list[dict], bool]:
+    ) -> tuple[list[dict], list[dict], str | None]:
         """
         Categorizes feedbacks AND self-corrects.
-        Returns (final_items, corrections_list, used_fallback) — True if any chunk fell back from Groq.
+        Returns (final_items, corrections_list, fallback_provider) — None if Gemini handled all chunks.
         """
-        items, corrections, used_fallback = await self._categorize_chunked(feedbacks, GROQ_CHUNK_SIZE)
-        return items, corrections, used_fallback
+        items, corrections, fallback_provider = await self._categorize_chunked(feedbacks, GROQ_CHUNK_SIZE)
+        return items, corrections, fallback_provider
 
     # ------------------------------------------------------------------
     # Step 2: Executive report

@@ -128,11 +128,11 @@ async def analysis_stream(feedbacks: list[str], app_name: str | None = None) -> 
     # 2. Iris — only on actionable
     yield sse_event("status", {"step": "categorization", "message": f"Analyzing {len(actionable_texts)} feedbacks…"})
     try:
-        items, corrections, used_fallback = await agent.categorize_and_validate(actionable_texts)
+        items, corrections, iris_fallback_provider = await agent.categorize_and_validate(actionable_texts)
     except Exception as e:
         yield sse_event("error", {"message": str(e)})
         return
-    yield sse_event("categorization", {"items": items, "corrections": corrections, "used_fallback": used_fallback})
+    yield sse_event("categorization", {"items": items, "corrections": corrections, "used_fallback": iris_fallback_provider is not None, "fallback_provider": iris_fallback_provider})
 
     # 3. Echo — LLM clustering
     yield sse_event("status", {"step": "clustering", "message": "Grouping feedbacks by topic…"})
