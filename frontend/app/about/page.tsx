@@ -149,7 +149,7 @@ export default function AboutPage() {
           </div>
           <Link
             href="/"
-            className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 border border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors"
           >
             ⚡ Try the app
           </Link>
@@ -161,7 +161,7 @@ export default function AboutPage() {
         {/* ── Hero ── */}
         <section>
           <div className="inline-block bg-indigo-50 text-indigo-600 text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-md mb-5">
-            🔧 How it&apos;s built
+            🔧 Case study
           </div>
           <h1 className="text-3xl font-extrabold text-gray-900 leading-tight mb-4">
             An agentic AI pipeline,<br />from store reviews to your Jira backlog
