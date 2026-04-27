@@ -128,6 +128,7 @@ export function useAnalysis() {
   const [appName, setAppName] = useState<string | null>(null);
   const correctionsRef = useRef<Correction[]>([]);
   const usedFallbackRef = useRef<boolean>(false);
+  const irisFallbackProviderRef = useRef<string | null>(null);
   const reportRef = useRef<{ text: string; fallback: boolean; fallback_provider?: string | null } | null>(null);
   const userStoryCardsRef = useRef<UserStoryCard[]>([]);
   const nonActionableItemsRef = useRef<string[]>([]);
@@ -148,6 +149,7 @@ export function useAnalysis() {
     setAppName(null);
     correctionsRef.current = [];
     usedFallbackRef.current = false;
+    irisFallbackProviderRef.current = null;
     reportRef.current = null;
     userStoryCardsRef.current = [];
     nonActionableItemsRef.current = [];
@@ -168,6 +170,7 @@ export function useAnalysis() {
     items,
     corrections: correctionsRef.current,
     used_fallback: usedFallbackRef.current,
+    iris_fallback_provider: irisFallbackProviderRef.current,
     report: reportRef.current?.text ?? "",
     report_fallback: reportRef.current?.fallback ?? false,
     report_fallback_provider: reportRef.current?.fallback_provider ?? null,
@@ -261,6 +264,7 @@ export function useAnalysis() {
       setPartialItems(d.items as FeedbackItem[]);
       correctionsRef.current = (d.corrections as Correction[]) ?? [];
       usedFallbackRef.current = fallback;
+      irisFallbackProviderRef.current = (d.fallback_provider as string | null) ?? null;
       setStep((prev) => prev.type === "categorization" ? { ...prev, usedFallback: fallback } : prev);
     } else if (event === "report") {
       // Penn finished — record timing

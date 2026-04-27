@@ -223,12 +223,10 @@ function AgentCard({
         </span>
         {usedFallback && FALLBACK_CHAINS[agent.id] && (
           <span
-            title={fallbackProvider
-              ? `Used: ${fallbackProvider} (Cerebras unavailable)`
-              : `Fallback chain: ${FALLBACK_CHAINS[agent.id]}`}
+            title={`Fallback chain: ${FALLBACK_CHAINS[agent.id]}`}
             className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium bg-orange-100 text-orange-600 cursor-help"
           >
-            ↩ {fallbackProvider ?? "fallback"}
+            ↩ Fallback{fallbackProvider ? ` · ${fallbackProvider}` : ""}
           </span>
         )}
       </div>
@@ -352,6 +350,7 @@ export default function AgentPipeline({
   clusterCount,
   siftedCount,
   irisFallback,
+  irisFallbackProvider,
   reportFallback,
   reportFallbackProvider,
   cardsFallbackProvider,
@@ -364,6 +363,7 @@ export default function AgentPipeline({
   clusterCount?: number;
   siftedCount?: number;
   irisFallback?: boolean;
+  irisFallbackProvider?: string | null;
   reportFallback?: boolean;
   reportFallbackProvider?: string | null;
   cardsFallbackProvider?: string | null;
@@ -388,12 +388,12 @@ export default function AgentPipeline({
     sift: siftFallback ?? false,
     categorization: irisFallback ?? false,
     report: reportFallback ?? false,
-    stella: cardsFallbackProvider != null ? true : (reportFallback ?? false),
+    stella: cardsFallbackProvider != null,
   };
 
   const fallbackProviders: Record<string, string | null> = {
     sift: null,
-    categorization: null,
+    categorization: irisFallbackProvider ?? null,
     report: reportFallbackProvider ?? null,
     stella: cardsFallbackProvider ?? null,
   };

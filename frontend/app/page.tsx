@@ -157,6 +157,7 @@ disabled={isRunning}
                   step.type === "categorization" ? step.usedFallback :
                   undefined
                 }
+                irisFallbackProvider={step.type === "done" ? step.result.iris_fallback_provider : undefined}
                 reportFallback={step.type === "done" ? step.result.report_fallback : undefined}
                 reportFallbackProvider={step.type === "done" ? step.result.report_fallback_provider : undefined}
                 cardsFallbackProvider={step.type === "done" ? step.result.cards_fallback_provider : undefined}

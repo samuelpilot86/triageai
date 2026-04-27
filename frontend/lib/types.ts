@@ -57,6 +57,7 @@ export interface AnalysisResult {
   items: FeedbackItem[];
   corrections: Correction[];
   used_fallback: boolean;
+  iris_fallback_provider?: string | null;
   report: string;
   report_fallback: boolean;
   report_fallback_provider?: string | null;
