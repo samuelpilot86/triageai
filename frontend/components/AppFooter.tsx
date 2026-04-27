@@ -137,7 +137,7 @@ export default function AppFooter() {
           <span>Made by <span className="font-medium text-gray-500">Samuel PILOT</span></span>
           <span>·</span>
           <a
-            href="https://linktr.ee/samuelpilot"
+            href="https://glimmer-shingle-064.notion.site/Samuel-PILOT-Portfolio-de-Product-Manager-Builder-IA-34d39a786f7780878871d96bda9772bb"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 hover:text-indigo-500 transition-colors"
