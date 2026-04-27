@@ -268,23 +268,19 @@ IMPORTANT RULES FOR CORRECTIONS:
 
         # 1. Gemini 3.1 Flash Lite — 250K TPM absorbs parallel chunks, 500 RPD free tier
         last_error: Exception | None = None
-        for attempt in range(3):
-            try:
-                response = await self.client.aio.models.generate_content(
-                    model=IRIS_MODEL, contents=prompt
-                )
-                return self._extract_text(response), False
-            except Exception as e:
-                last_error = e
-                error_str = str(e)
-                is_retryable = "503" in error_str or "UNAVAILABLE" in error_str or "high demand" in error_str.lower()
-                if is_retryable and attempt < 2:
-                    await _asyncio.sleep(2 ** attempt)
-                    continue
-                is_quota = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower()
-                if is_quota:
-                    errors.append(f"Gemini: {error_str[:150]}")
-                    break
+        try:
+            response = await self.client.aio.models.generate_content(
+                model=IRIS_MODEL, contents=prompt
+            )
+            return self._extract_text(response), False
+        except Exception as e:
+            last_error = e
+            error_str = str(e)
+            is_retryable = "503" in error_str or "UNAVAILABLE" in error_str or "high demand" in error_str.lower()
+            is_quota = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower()
+            if is_quota or is_retryable:
+                errors.append(f"Gemini: {error_str[:150]}")
+            else:
                 raise
 
         # 2. Groq (llama-3.3-70b-versatile) — fallback
@@ -384,23 +380,19 @@ IMPORTANT RULES FOR CORRECTIONS:
 
         # 1. Gemini 3.1 Flash Lite — primary for Penn/Nova (reliable free tier, 500 RPD)
         last_error = None
-        for attempt in range(3):
-            try:
-                response = await self.client.aio.models.generate_content(
-                    model=IRIS_MODEL,
-                    contents=prompt,
-                )
-                return self._extract_text(response), None
-            except Exception as e:
-                error_str = str(e)
-                last_error = e
-                if _is_retryable(error_str) and attempt < 2:
-                    await _asyncio.sleep(2 ** attempt)
-                    continue
-                elif _is_quota(error_str) or _is_retryable(error_str):
-                    break
-                else:
-                    raise
+        try:
+            response = await self.client.aio.models.generate_content(
+                model=IRIS_MODEL,
+                contents=prompt,
+            )
+            return self._extract_text(response), None
+        except Exception as e:
+            error_str = str(e)
+            last_error = e
+            if _is_quota(error_str) or _is_retryable(error_str):
+                pass  # fall through to fallback chain
+            else:
+                raise
         fallback_errors.append(f"Gemini: {str(last_error)[:100] if last_error else 'unknown'}")
 
         # 2. Cerebras GLM 4.7 — fast when available (100 RPD free tier)
