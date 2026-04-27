@@ -377,7 +377,7 @@ export default function AboutPage() {
               </p>
               <div className="flex items-center gap-3 flex-wrap">
                 <a
-                  href="https://linktr.ee/samuelpilot"
+                  href="https://glimmer-shingle-064.notion.site/Samuel-PILOT-Portfolio-de-Product-Manager-Builder-IA-34d39a786f7780878871d96bda9772bb"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition-colors"
