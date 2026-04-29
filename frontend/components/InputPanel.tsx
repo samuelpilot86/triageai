@@ -142,7 +142,7 @@ export default function InputPanel({ onAnalyzeText, onAnalyzeCsv, onAnalyzeStore
     <div className="w-full max-w-2xl mx-auto">
       {/* Tabs */}
       <div className="flex border-b border-gray-200 mb-6">
-        {(["store", "csv", "text", "demo"] as Tab[]).map((t) => (
+        {(["demo", "store", "csv", "text"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => { setTab(t); notifySource(t, store); }}
