@@ -1,0 +1,17 @@
+name: Keep HuggingFace Space alive
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"  # every 5 minutes
+  workflow_dispatch:        # allow manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend
+        run: |
+          curl -sf --max-time 30 \
+            https://samuelpilot-triageai.hf.space/api/health \
+            && echo "Space is alive" \
+            || echo "Ping failed (Space may be starting up)"
