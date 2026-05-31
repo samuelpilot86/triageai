@@ -311,17 +311,20 @@ export function useAnalysis() {
     allEstimatesRef.current = estimates;
   }, []);
 
-  // Sets categorization step with timing estimate, then kicks off SSE
-  const startCategorization = useCallback(async (
+  // Sets categorization step immediately, then fills in timing estimate asynchronously
+  const startCategorization = useCallback((
     n: number,
     launchStream: () => () => void
   ) => {
-    const estimatedMs = await fetchTimingEstimate("categorization", n);
     const startedAt = Date.now();
     categorizationStartRef.current = startedAt;
     nFeedbacksRef.current = n;
-    setStep({ type: "categorization", estimatedMs, startedAt, nFeedbacks: n });
+    setStep({ type: "categorization", startedAt, nFeedbacks: n });
     setPartialItems([]);
+    // Fetch estimate in background — update step when ready
+    fetchTimingEstimate("categorization", n).then((estimatedMs) => {
+      setStep((prev) => prev.type === "categorization" ? { ...prev, estimatedMs } : prev);
+    });
     return launchStream();
   }, []);
 
@@ -379,15 +382,17 @@ export function useAnalysis() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ app, store, count }),
       },
-      async (event, data) => {
-        // When scraping done, switch to categorization with estimate
+      (event, data) => {
+        // When scraping done, switch to categorization immediately then fill estimate
         if (event === "scraped") {
           const count = (data as Record<string, unknown>).count as number ?? 100;
-          const estimatedMs = await fetchTimingEstimate("categorization", count);
           const startedAt = Date.now();
           categorizationStartRef.current = startedAt;
           nFeedbacksRef.current = count;
-          setStep({ type: "categorization", estimatedMs, startedAt, nFeedbacks: count, scrapedCount: count });
+          setStep({ type: "categorization", startedAt, nFeedbacks: count, scrapedCount: count });
+          fetchTimingEstimate("categorization", count).then((estimatedMs) => {
+            setStep((prev) => prev.type === "categorization" ? { ...prev, estimatedMs } : prev);
+          });
         } else {
           handleEvents(event, data);
         }
