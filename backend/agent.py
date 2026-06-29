@@ -128,8 +128,8 @@ def _require_content(response, source: str) -> str:
 IRIS_MODEL = "gemini-3.1-flash-lite-preview"   # Gemini 3.1 Flash Lite: 250K TPM, 500 RPD free
 CEREBRAS_STRUCTURED_MODEL = "gpt-oss-120b"              # Sift, Echo — fast MoE, 5.1B active params
 CEREBRAS_NARRATIVE_MODEL = "zai-glm-4.7"  # Penn, Nova — GLM 4.7 (Zhipu/Z.ai); replaces Qwen 235B (retired May 27 2026); 100 RPD free
-FALLBACK_MODEL = "llama-3.3-70b-versatile"
-FALLBACK_MODEL_MAX_TOKENS = 32_768  # llama-3.3-70b-versatile hard limit
+FALLBACK_MODEL = "gpt-oss-120b"
+FALLBACK_MODEL_MAX_TOKENS = 32_768
 
 # Output token budget per feedback (JSON fields: original, summary, category,
 # priority, priority_reason + corrections) + fixed overhead
