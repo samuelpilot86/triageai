@@ -151,11 +151,11 @@ function IrisProgressBar({
 // ------------------------------------------------------------------
 
 const FALLBACK_CHAINS: Record<string, string> = {
-  sift: "Cerebras · gpt-oss-120b → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
-  categorization: "Gemini 3.1 Flash Lite → Groq · Llama 3.3 70B → OpenRouter · auto",
-  clustering: "Cerebras · gpt-oss-120b → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
-  report: "Gemini 3.1 Flash Lite → Cerebras · GLM 4.7 → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
-  stella: "Gemini 3.1 Flash Lite → Cerebras · GLM 4.7 → Mistral Small → OpenRouter · auto → Groq · Llama 3.3 70B",
+  sift: "Cerebras · gpt-oss-120b → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · gpt-oss-120b",
+  categorization: "Gemini 3.1 Flash Lite → Groq · gpt-oss-120b → OpenRouter · auto",
+  clustering: "Cerebras · gpt-oss-120b → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · gpt-oss-120b",
+  report: "Gemini 3.1 Flash Lite → Cerebras · GLM 4.7 → Mistral Small → OpenRouter · auto → Groq · gpt-oss-120b",
+  stella: "Gemini 3.1 Flash Lite → Cerebras · GLM 4.7 → Mistral Small → OpenRouter · auto → Groq · gpt-oss-120b",
 };
 
 function AgentCard({
