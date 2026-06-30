@@ -122,7 +122,7 @@ const STACK_CATEGORIES = [
   },
   {
     label: "AI Models",
-    items: ["Cerebras · gpt-oss-120b", "Gemini 3.1 Flash Lite", "Cerebras · GLM 4.7 (fallback)"],
+    items: ["Cerebras · gpt-oss-120b", "Gemini 3.1 Flash Lite", "Groq · Qwen 3.6 27B (fallback)"],
   },
   {
     label: "Integrations",
