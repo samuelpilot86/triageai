@@ -4,10 +4,10 @@ agent.py — Core logic of the product feedback triage agent.
 Model routing:
   - Sift  (pre-filter)     : Cerebras / gpt-oss-120b — fast MoE, minimal output, falls back to Gemini.
   - Iris  (categorization) : Gemini 3.1 Flash Lite — 250K TPM absorbs parallel chunks, 500 RPD.
-                             Falls back to Groq if Gemini unavailable.
+                             Falls back to Groq Qwen 3.8 27B if Gemini unavailable.
   - Echo  (clustering)     : Cerebras / gpt-oss-120b — structured JSON, small output, fast.
   - Penn  (report)         : Gemini 3.1 Flash Lite — reliable primary; Cerebras GLM 4.7 as fallback.
-                             Falls back to Cerebras GLM 4.7, then Mistral, then Groq.
+                             Falls back to Cerebras GLM 4.7, then Mistral, then Groq Qwen 3.8 27B.
   - Nova  (sprint cards)   : Gemini 3.1 Flash Lite — same rationale as Penn.
 """
 
@@ -128,8 +128,8 @@ def _require_content(response, source: str) -> str:
 IRIS_MODEL = "gemini-3.1-flash-lite-preview"   # Gemini 3.1 Flash Lite: 250K TPM, 500 RPD free
 CEREBRAS_STRUCTURED_MODEL = "gpt-oss-120b"              # Sift, Echo — fast MoE, 5.1B active params
 CEREBRAS_NARRATIVE_MODEL = "zai-glm-4.7"  # Penn, Nova — GLM 4.7 (Zhipu/Z.ai); replaces Qwen 235B (retired May 27 2026); 100 RPD free
-FALLBACK_MODEL = "qwen-3.6-27b"
-FALLBACK_MODEL_MAX_TOKENS = 32_768
+FALLBACK_MODEL = "qwen/qwen3.8-27b"  # Groq last-resort; successor to qwen-3.6-27b (decommissioned 14 Sep 2026)
+FALLBACK_MODEL_MAX_TOKENS = 16_384  # Groq max completion tokens for Qwen 3.8 27B
 
 # Output token budget per feedback (JSON fields: original, summary, category,
 # priority, priority_reason + corrections) + fixed overhead
@@ -146,8 +146,8 @@ SIFT_CHUNK_SIZE = 25   # Sift parallelization: 25 feedbacks/chunk → 4 parallel
 class FeedbackTriageAgent:
     """
     Product feedback triage agent.
-    Primary: Cerebras (Sift/Echo: gpt-oss-120b, Penn/Nova: Qwen 3 235B) + Gemini 3.1 Flash Lite (Iris).
-    Fallbacks: Gemini → Mistral → OpenRouter → Groq.
+    Primary: Cerebras (Sift/Echo: gpt-oss-120b) + Gemini 3.1 Flash Lite (Iris, Penn, Nova).
+    Fallbacks: Cerebras GLM 4.7 → Mistral → OpenRouter → Groq Qwen 3.8 27B.
     """
 
     def __init__(
@@ -188,6 +188,19 @@ class FeedbackTriageAgent:
             max_tokens=max_tokens,
         )
         return _require_content(response, f"Cerebras/{model}")
+
+    async def _call_groq(self, prompt: str, max_tokens: int) -> str:
+        """Groq last-resort call. Instruct mode (no thinking) keeps JSON/prose clean."""
+        if self.groq_client is None:
+            raise RuntimeError("Groq client not configured")
+        response = await self.groq_client.chat.completions.create(
+            model=FALLBACK_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=max_tokens,
+            extra_body={"reasoning_effort": "none"},
+        )
+        return _require_content(response, "Groq")
 
     # ------------------------------------------------------------------
     # Central LLM call with fallback
@@ -291,16 +304,10 @@ IMPORTANT RULES FOR CORRECTIONS:
                 else:
                     raise
 
-        # 2. Groq (llama-3.3-70b-versatile) — fallback
+        # 2. Groq Qwen 3.8 27B — first fallback (Iris only)
         if self.groq_client:
             try:
-                response = await self.groq_client.chat.completions.create(
-                    model=FALLBACK_MODEL,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.2,
-                    max_tokens=groq_max_tokens,
-                )
-                return _require_content(response, "Groq"), "Groq"
+                return await self._call_groq(prompt, groq_max_tokens), "Groq"
             except Exception as e:
                 errors.append(f"Groq: {e}")
 
@@ -447,16 +454,10 @@ IMPORTANT RULES FOR CORRECTIONS:
             except Exception as e:
                 fallback_errors.append(f"OpenRouter: {type(e).__name__}: {e}")
 
-        # 5. Groq — last resort
+        # 5. Groq Qwen 3.8 27B — last resort
         if self.groq_client:
             try:
-                response = await self.groq_client.chat.completions.create(
-                    model=FALLBACK_MODEL,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.2,
-                    max_tokens=groq_max_tokens,
-                )
-                return _require_content(response, "Groq"), "Groq"
+                return await self._call_groq(prompt, groq_max_tokens), "Groq"
             except Exception as e:
                 fallback_errors.append(f"Groq: {e}")
 

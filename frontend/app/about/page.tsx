@@ -62,7 +62,7 @@ const MODEL_ROUTING = [
     emoji: "🔬",
     badge: "Gemini 3.1 Flash Lite",
     badgeClass: "bg-indigo-100 text-indigo-800",
-    why: "The heaviest step: 4 parallel chunks of structured JSON classification with self-review. Gemini 3.1 Flash Lite's 500 RPD (vs 20 on 2.5) and 250K TPM absorb the per-run fan-out.",
+    why: "The heaviest step: 4 parallel chunks of structured JSON classification with self-review. Gemini 3.1 Flash Lite's 500 RPD (vs 20 on 2.5) and 250K TPM absorb the per-run fan-out. If Gemini is down, Iris falls back first to Groq · Qwen 3.8 27B in instruct mode (no chain-of-thought), which keeps the JSON self-review intact.",
   },
   {
     agent: "Echo",
@@ -122,7 +122,7 @@ const STACK_CATEGORIES = [
   },
   {
     label: "AI Models",
-    items: ["Cerebras · gpt-oss-120b", "Gemini 3.1 Flash Lite", "Groq · Qwen 3.6 27B (fallback)"],
+    items: ["Cerebras · gpt-oss-120b", "Gemini 3.1 Flash Lite", "Groq · Qwen 3.8 27B (fallback)"],
   },
   {
     label: "Integrations",
@@ -240,6 +240,7 @@ export default function AboutPage() {
           <ul className="text-sm text-gray-500 mb-6 space-y-1 pl-4">
             <li className="list-disc leading-relaxed">Cerebras handles the fast filtering and clustering steps, leveraging its high-throughput inference.</li>
             <li className="list-disc leading-relaxed">Gemini 3.1 Flash Lite drives all generation steps — categorization, report and sprint cards — combining strong reasoning with reliable availability.</li>
+            <li className="list-disc leading-relaxed">Groq · Qwen 3.8 27B is the last-resort fallback: a dense 27B successor to Qwen 3.6, used in instruct mode so structured JSON stays intact when primary providers are down. For Iris it is the first fallback after Gemini; on the other steps it sits after Cerebras, Mistral and OpenRouter.</li>
           </ul>
 
           <div className="rounded-xl border border-gray-200 overflow-hidden">
