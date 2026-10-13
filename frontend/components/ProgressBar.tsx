@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 const STEPS = [
   { key: "scraping", label: "Fetching reviews" },
   { key: "categorization", label: "Categorizing" },
-  { key: "report", label: "Generating report" },
+  { key: "stella", label: "Writing cards" },
   { key: "done", label: "Done" },
 ];
 
@@ -77,8 +77,7 @@ export default function ProgressBar({ step }: { step: AnalysisStep }) {
   if (step.type === "idle") return null;
   if (step.type === "error") return null;
 
-  // Nova (stella) shares the "report" top-level phase for this coarse indicator
-  const effectiveType = step.type === "stella" ? "report" : step.type;
+  const effectiveType = step.type;
   const currentIndex = STEPS.findIndex((s) => s.key === effectiveType);
   const showScraping = step.type === "scraping";
 

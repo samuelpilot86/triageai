@@ -27,9 +27,11 @@ export interface SprintFeedback {
   translation?: string;
 }
 
+export type RiceImpact = 0.25 | 0.5 | 1 | 2 | 3;
+
 export interface RiceScore {
   reach: number;
-  impact: 1 | 2 | 3;
+  impact: RiceImpact;
   confidence: number;
   effort_label: "XS" | "S" | "M" | "L" | "XL";
   effort: number;

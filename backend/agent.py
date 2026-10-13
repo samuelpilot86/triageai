@@ -6,15 +6,13 @@ Model routing:
   - Iris  (categorization) : Gemini 3.1 Flash Lite — 250K TPM absorbs parallel chunks, 500 RPD.
                              Falls back to Groq Qwen 3.8 27B if Gemini unavailable.
   - Echo  (clustering)     : Cerebras / gpt-oss-120b — structured JSON, small output, fast.
-  - Penn  (report)         : Gemini 3.1 Flash Lite — reliable primary; Cerebras GLM 4.7 as fallback.
-                             Falls back to Cerebras GLM 4.7, then Mistral, then Groq Qwen 3.8 27B.
-  - Nova  (sprint cards)   : Gemini 3.1 Flash Lite — same rationale as Penn.
+  - Nova  (sprint cards)   : Gemini 3.1 Flash Lite — one RICE card per cluster.
+  The executive report (Penn) lives in parked_report.py and is not called.
 """
 
 import asyncio
 import json
 import re
-import pandas as pd
 from google import genai
 from groq import AsyncGroq
 
@@ -46,13 +44,10 @@ def _get_embedding_model():
 # Semantic clustering
 # ------------------------------------------------------------------
 
-_PRIORITY_SCORE = {"High": 3, "Medium": 1, "Low": 0}
-
-
 def _cluster_items(items: list[dict]) -> list[dict]:
     """
     Clusters feedback items by semantic similarity of their Iris summaries.
-    Returns clusters sorted by priority score desc (High=3, Medium=1, Low=0).
+    score is the number of feedbacks in the cluster. Ticket order is RICE, later.
     Each cluster dict: {score, representative_summary, category, items}.
     """
     import numpy as np
@@ -74,7 +69,7 @@ def _cluster_items(items: list[dict]) -> list[dict]:
     result = []
     for label, indices in cluster_map.items():
         cluster_items = [items[i] for i in indices]
-        score = sum(_PRIORITY_SCORE.get(it.get("priority", "Low"), 0) for it in cluster_items)
+        score = len(cluster_items)
 
         # Representative feedback: closest to centroid
         cluster_embs = np.array([embeddings[i] for i in indices])
@@ -127,12 +122,12 @@ def _require_content(response, source: str) -> str:
 
 IRIS_MODEL = "gemini-3.1-flash-lite-preview"   # Gemini 3.1 Flash Lite: 250K TPM, 500 RPD free
 CEREBRAS_STRUCTURED_MODEL = "gpt-oss-120b"              # Sift, Echo — fast MoE, 5.1B active params
-CEREBRAS_NARRATIVE_MODEL = "zai-glm-4.7"  # Penn, Nova — GLM 4.7 (Zhipu/Z.ai); replaces Qwen 235B (retired May 27 2026); 100 RPD free
+CEREBRAS_NARRATIVE_MODEL = "zai-glm-4.7"  # Nova — GLM 4.7 (Zhipu/Z.ai); replaces Qwen 235B (retired May 27 2026); 100 RPD free
 FALLBACK_MODEL = "qwen/qwen3.8-27b"  # Groq last-resort; successor to qwen-3.6-27b (decommissioned 14 Sep 2026)
 FALLBACK_MODEL_MAX_TOKENS = 16_384  # Groq max completion tokens for Qwen 3.8 27B
 
-# Output token budget per feedback (JSON fields: original, summary, category,
-# priority, priority_reason + corrections) + fixed overhead
+# Output token budget per feedback (JSON fields: original, summary, category
+# + corrections) + fixed overhead
 _TOKENS_PER_FEEDBACK = 250
 _TOKENS_OVERHEAD = 512
 
@@ -143,10 +138,34 @@ GROQ_CHUNK_SIZE = 30
 SIFT_CHUNK_SIZE = 25   # Sift parallelization: 25 feedbacks/chunk → 4 parallel calls on 100 feedbacks
 
 
+_RICE_IMPACT = (0.25, 0.5, 1.0, 2.0, 3.0)
+
+
+def _normalize_rice(card: dict) -> None:
+    """Snap impact onto Intercom's scale and recompute the score from the formula."""
+    rice = card.get("rice")
+    if not isinstance(rice, dict):
+        return
+    try:
+        raw = float(rice.get("impact"))
+    except (TypeError, ValueError):
+        raw = 1.0
+    impact = min(_RICE_IMPACT, key=lambda step: abs(step - raw))
+    rice["impact"] = impact if impact < 1 else int(impact)
+    try:
+        reach = float(rice.get("reach") or 0)
+        confidence = float(rice.get("confidence") or 0)
+        effort = float(rice.get("effort") or 0)
+    except (TypeError, ValueError):
+        return
+    if effort > 0:
+        rice["score"] = int(round((reach * impact * confidence / effort) * 10))
+
+
 class FeedbackTriageAgent:
     """
     Product feedback triage agent.
-    Primary: Cerebras (Sift/Echo: gpt-oss-120b) + Gemini 3.1 Flash Lite (Iris, Penn, Nova).
+    Primary: Cerebras (Sift/Echo: gpt-oss-120b) + Gemini 3.1 Flash Lite (Iris, Nova).
     Fallbacks: Cerebras GLM 4.7 → Mistral → OpenRouter → Groq Qwen 3.8 27B.
     """
 
@@ -223,16 +242,10 @@ For each feedback, determine:
 - original    : exact original text
 - summary     : concise summary in 6 words or fewer
 - category    : ONE of: {categories_str}
-- priority    : "High", "Medium" or "Low"
-  * High   = blocking issue or strong impact on retention/acquisition
-  * Medium = significant friction but has a workaround
-  * Low    = cosmetic improvement or edge case
-- priority_reason : justification in 10 words or fewer
 
 ═══ PHASE 2 — SELF-CORRECTION ═══
 Review your own decisions critically:
 - Is the category truly the most accurate one?
-- Is the priority consistent with the real product impact?
 - Are there inconsistencies across similar feedbacks?
 Apply corrections directly in the final feedbacks output.
 
@@ -245,15 +258,13 @@ Return ONLY valid JSON, no markdown, no surrounding text:
       "id": 1,
       "original": "...",
       "summary": "...",
-      "category": "...",
-      "priority": "...",
-      "priority_reason": "..."
+      "category": "..."
     }}
   ],
   "corrections": [
     {{
       "id": <corrected feedback id>,
-      "field": "category" | "priority",
+      "field": "category",
       "old_value": "initial value",
       "new_value": "corrected value",
       "reason": "justification in 10 words max"
@@ -377,7 +388,7 @@ IMPORTANT RULES FOR CORRECTIONS:
     ) -> tuple[str, bool]:
         """
         General call chain: Gemini 3.1 Flash Lite → Cerebras (GLM 4.7) → Mistral → OpenRouter → Groq.
-        Gemini is primary for Penn/Nova (Cerebras GLM 4.7 access unreliable on free tier).
+        Gemini is primary for Nova (Cerebras GLM 4.7 access unreliable on free tier).
         Returns (response_text, fallback_provider). fallback_provider is None if Gemini succeeded,
         or a string like "Cerebras", "Groq", etc. identifying which fallback was used.
         """
@@ -393,7 +404,7 @@ IMPORTANT RULES FOR CORRECTIONS:
         groq_max_tokens = min(FALLBACK_MODEL_MAX_TOKENS, max_tokens)
         nemotron_max_tokens = min(4096, max_tokens)
 
-        # 1. Gemini 3.1 Flash Lite — primary for Penn/Nova (reliable free tier, 500 RPD)
+        # 1. Gemini 3.1 Flash Lite — primary for Nova (reliable free tier, 500 RPD)
         last_error = None
         for attempt in range(2):  # 1 retry on transient 503s, no retry on quota errors
             try:
@@ -527,7 +538,7 @@ Return ONLY valid JSON array of integers, e.g.: [1, 3, 5]"""
     async def cluster_with_llm(self, items: list[dict]) -> list[dict]:
         """
         Clusters feedback items using a single LLM call on their summaries.
-        Returns clusters sorted by priority score desc (High=3, Medium=1, Low=0).
+        score is the number of feedbacks in the cluster. Ticket order is RICE, on the cards.
         Each cluster dict: {score, cluster_label, category, items}.
         Tags each item with cluster_id and cluster_label.
         """
@@ -568,7 +579,7 @@ YOUR RESPONSE MUST START WITH [ AND CONTAIN ONLY A VALID JSON ARRAY. No explanat
                 continue
             cluster_items = [item_by_id[i] for i in cluster_ids]
             assigned_ids.update(cluster_ids)
-            score = sum(_PRIORITY_SCORE.get(it.get("priority", "Low"), 0) for it in cluster_items)
+            score = len(cluster_items)
             cats = [it.get("category", "") for it in cluster_items]
             majority_cat = max(set(cats), key=cats.count)
             result.append({
@@ -581,7 +592,7 @@ YOUR RESPONSE MUST START WITH [ AND CONTAIN ONLY A VALID JSON ARRAY. No explanat
         # Any items not assigned by LLM go to an "Other" cluster
         unassigned = [it for it in items if it["id"] not in assigned_ids]
         if unassigned:
-            score = sum(_PRIORITY_SCORE.get(it.get("priority", "Low"), 0) for it in unassigned)
+            score = len(unassigned)
             cats = [it.get("category", "") for it in unassigned]
             majority_cat = max(set(cats), key=cats.count) if cats else "Other"
             result.append({
@@ -615,141 +626,95 @@ YOUR RESPONSE MUST START WITH [ AND CONTAIN ONLY A VALID JSON ARRAY. No explanat
         items, corrections, fallback_provider = await self._categorize_chunked(feedbacks, GROQ_CHUNK_SIZE)
         return items, corrections, fallback_provider
 
-    # ------------------------------------------------------------------
-    # Step 2: Executive report
-    # ------------------------------------------------------------------
-
-    async def generate_report(self, items: list[dict], clusters: list[dict], app_name: str | None = None) -> tuple[str, list[str], bool]:
-        """
-        Generates a PM executive report from the categorized feedbacks.
-        clusters must be pre-computed by _cluster_items (called externally so Echo step can be tracked).
-        Returns (report_text, actions, used_fallback).
-        """
-        df = pd.DataFrame(items)
-        priority_stats = df["priority"].value_counts().to_dict()
-
-        # Build prompt context from top 6 clusters
-        clusters_for_prompt = []
-        for c in clusters[:6]:
-            high_med = [it for it in c["items"] if it.get("priority") in ("High", "Medium")]
-            verbatims = [it["original"][:200] for it in high_med]
-            clusters_for_prompt.append({
-                "priority_score": c["score"],
-                "cluster_label": c.get("cluster_label", c.get("representative_summary", "")),
-                "category": c["category"],
-                "total_feedbacks": len(c["items"]),
-                "high": sum(1 for it in c["items"] if it.get("priority") == "High"),
-                "medium": sum(1 for it in c["items"] if it.get("priority") == "Medium"),
-                "verbatims": verbatims,
-            })
-
-        app_context = f' for the app "{app_name}"' if app_name else ""
-        app_rule = (
-            f'- The product under review is "{app_name}". Mention it by name in the Summary section (at least once).\n'
-            if app_name else ""
-        )
-        prompt = f"""You are a senior Product Manager. Generate an executive report based on this analysis of {len(items)} user feedbacks{app_context}.
-
-OVERVIEW:
-- By priority: {json.dumps(priority_stats, ensure_ascii=False)}
-
-ISSUE CLUSTERS (semantically grouped, sorted by priority score — High=3pts, Medium=1pt, Low=0pt):
-{json.dumps(clusters_for_prompt, ensure_ascii=False, indent=2)}
-
-Each cluster includes:
-- priority_score: sum of priority weights across all feedbacks in the cluster
-- cluster_label: short descriptive name for the cluster
-- verbatims: real user quotes (original language) from High/Medium feedbacks in this cluster
-
-Return ONLY valid JSON (no markdown, no surrounding text) with this exact structure:
-{{
-  "report": "## Summary\\n[2-3 sentences on overall product health, referencing specific issues from the top clusters.]\\n\\n## Top 3 Recommended Actions\\n1. **[Action title: verb + specific component/flow/feature]** — [What breaks or frustrates, evidence from verbatims, impact on retention]\\n2. **[same format]** — [same detail]\\n3. **[same format]** — [same detail]\\n\\n## Weak Signal to Watch\\n[1 non-obvious insight from a lower-ranked cluster]",
-  "actions": ["exact action title 1", "exact action title 2", "exact action title 3"]
-}}
-
-Rules:
-{app_rule}- Derive each action from one of the top 3 clusters in order of priority_score
-- Action titles must name the specific feature, screen, or behaviour (e.g. "Fix voice mode interruption on iOS" not "fix bugs")
-- Justify each action with data from the cluster's verbatims and counts
-- Actions must be specific enough to copy directly as sprint backlog ticket titles
-- Tone: senior product consultant, concise, decision-oriented
-- The "actions" array must contain EXACTLY the bold titles from ## Top 3 Recommended Actions, verbatim"""
-
-        text, fallback_provider = await self._call_llm(prompt, max_tokens=2500)
-        try:
-            # Strip markdown fences and sanitize literal newlines inside JSON strings
-            clean = re.sub(r"```(?:json)?\s*\n?", "", text)
-            clean = re.sub(r"\n?```", "", clean).strip()
-            # Replace literal newlines inside JSON string values with \n escape
-            clean = re.sub(r'(?<=": ")(.*?)(?="[,\n}\]])', lambda m: m.group(0).replace("\n", "\\n"), clean, flags=re.DOTALL)
-            parsed = json.loads(clean)
-            report_md = parsed.get("report", clean)
-            actions = parsed.get("actions", [])
-        except Exception:
-            # Last resort: extract report field with regex
-            m = re.search(r'"report"\s*:\s*"(.*?)"(?=\s*,\s*"actions")', text, re.DOTALL)
-            if m:
-                report_md = m.group(1).replace("\\n", "\n").replace('\\"', '"')
-                actions_m = re.findall(r'"([^"]+)"', text.split('"actions"')[-1])
-                actions = actions_m[:3] if actions_m else []
-            else:
-                # Strip fences at minimum so raw JSON isn't shown
-                report_md = re.sub(r"```(?:json)?\s*\n?|\n?```", "", text).strip()
-                actions = []
-        return report_md, actions, fallback_provider
-
     async def generate_user_stories(
         self, clusters: list[dict], actions: list[str]
-    ) -> tuple[list[dict], bool]:
+    ) -> tuple[list[dict], str | None]:
         """
-        Generates actionable sprint cards for each of the 3 recommended actions.
-        Each action maps to the corresponding top cluster (clusters[0] → action 0, etc.).
-        Format adapts to action type (bug, feature, ux, etc.) and includes RICE scoring.
-        Returns (cards, used_fallback).
+        One sprint card per cluster. The action title is the cluster label.
+        Every feedback in the cluster is kept on the card.
+        Cards are sorted by RICE score descending.
+        Returns (cards, fallback_provider).
         """
-        # Build per-action feedback lists from the top 3 clusters
-        per_action_feedbacks = []
-        for i, action in enumerate(actions[:3]):
-            if i < len(clusters):
-                cluster_items = clusters[i]["items"]
-            else:
-                # Fallback: shouldn't happen, but use all items as safety net
-                cluster_items = [it for c in clusters for it in c["items"]]
+        def _norm(s: str) -> str:
+            return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
+
+        def _parse_card(text: str) -> dict | None:
+            clean = re.sub(r"```(?:json)?\s*\n?", "", text)
+            clean = re.sub(r"\n?```", "", clean).strip()
+            try:
+                parsed = json.loads(clean)
+            except Exception:
+                m = re.search(r"\{[\s\S]*\}", clean)
+                if not m:
+                    return None
+                try:
+                    parsed = json.loads(m.group(0))
+                except Exception:
+                    return None
+            if isinstance(parsed, list):
+                parsed = parsed[0] if parsed else None
+            return parsed if isinstance(parsed, dict) else None
+
+        def _attach_feedbacks(card: dict, items: list[dict], action: str) -> dict:
+            model_fbs = [fb for fb in (card.get("feedbacks") or []) if isinstance(fb, dict)]
+            by_index = len(model_fbs) == len(items)
+            by_norm: dict[str, str] = {}
+            for fb in model_fbs:
+                tr = fb.get("translation")
+                text = fb.get("text") or ""
+                if tr and _norm(tr) != _norm(text):
+                    by_norm[_norm(text)] = tr
+            rebuilt = []
+            for i, it in enumerate(items):
+                original = it.get("original") or ""
+                entry: dict = {"text": original}
+                tr = None
+                if by_index:
+                    raw = model_fbs[i].get("translation")
+                    quoted = model_fbs[i].get("text") or ""
+                    if raw and _norm(raw) != _norm(original) and _norm(raw) != _norm(quoted):
+                        tr = raw
+                if tr is None:
+                    tr = by_norm.get(_norm(original))
+                if tr:
+                    entry["translation"] = tr
+                rebuilt.append(entry)
+            card["feedbacks"] = rebuilt
+            card["action"] = action
+            return card
+
+        async def one(index: int, action: str) -> tuple[dict | None, str | None]:
+            items = clusters[index]["items"] if index < len(clusters) else []
             feedbacks = [
-                {"original": it["original"], "summary": it.get("summary", ""), "priority": it.get("priority", "")}
-                for it in cluster_items
+                {"original": it.get("original", ""), "summary": it.get("summary", "")}
+                for it in items
             ]
-            per_action_feedbacks.append({"action": action, "feedbacks": feedbacks})
+            prompt = f"""You are a senior Product Manager writing one actionable sprint card.
 
-        actions_str = "\n".join(f"{i+1}. {a}" for i, a in enumerate(actions))
-        feedbacks_str = json.dumps(per_action_feedbacks, ensure_ascii=False, indent=2)
+ACTION (copy this title verbatim into the "action" field):
+{action}
 
-        total_items = sum(len(c["items"]) for c in clusters)
-        prompt = f"""You are a senior Product Manager writing actionable sprint cards.
+USER FEEDBACKS for this action, in order. There are {len(feedbacks)}. Include every one.
+{json.dumps(feedbacks, ensure_ascii=False, indent=2)}
 
-THE 3 RECOMMENDED ACTIONS:
-{actions_str}
-
-USER FEEDBACKS PER ACTION (each action is pre-matched to its semantic cluster of feedbacks):
-{feedbacks_str}
-
-Total feedbacks analyzed: {total_items}
-
-For each action, produce a card following these steps:
+Follow these steps:
 
 STEP 1 — Detect action_type: "bug" | "performance" | "feature" | "ux" | "pricing" | "ai_quality" | "other"
   Use "ai_quality" when the action addresses the quality, tone, accuracy, or relevance of AI-generated responses.
 
-STEP 2 — Select 2–4 quotes STRICTLY relevant to this action's specific topic.
-STRICT RELEVANCE: only include a quote if its content directly and specifically addresses this action.
-Never include generic complaints or praise that could apply to any issue.
-If fewer than 2 quotes qualify, include only those that do.
-For each selected quote, detect its language. If it is NOT English, add an "translation" field
+STEP 2 — Copy EVERY feedback above into "feedbacks", in the same order, verbatim in "text".
+Do not drop, merge, or shorten a feedback.
+For each quote, detect its language. If it is NOT English, add a "translation" field
 with a concise English translation. If it IS English, omit the "translation" field entirely.
 
 STEP 3 — Estimate RICE:
 - reach: integer count of feedbacks in this action's cluster that directly address this issue
-- impact: 1=low friction | 2=significant friction or churn risk | 3=blocking or critical
+- impact: how much this hurts each person who hits it. Use ONLY one of these values (Intercom's RICE scale):
+  * 3    = massive (blocking, or they leave)
+  * 2    = high
+  * 1    = medium
+  * 0.5  = low
+  * 0.25 = minimal (cosmetic)
 - confidence: 0.2 to 1.0 — how reliable are your estimates of R, I and E?
     Independent of reach. Ask: "How sure am I that these numbers are right?"
     * 0.8–1.0 : issue is clearly defined and reproducible; impact and effort estimates are well-grounded
@@ -762,68 +727,45 @@ STEP 3 — Estimate RICE:
 STEP 4 — Fill the template matching action_type:
 - bug or performance → provide: what_breaks, done_when, next_step
 - feature → provide: user_story ("As a [type], I want [X] so that [Y]"), acceptance_criteria (2–4 testable Given/When/Then strings)
-- ux, pricing, other → provide: problem, success_metric, next_step
+- ux, pricing, ai_quality, other → provide: problem, success_metric, next_step
 
-Return ONLY a valid JSON array, no markdown, no surrounding text:
-[
-  {{
-    "action": "exact action title verbatim",
-    "action_type": "bug",
-    "feedbacks": [
-      {{"text": "verbatim quote in original language", "translation": "English translation"}},
-      {{"text": "verbatim English quote"}}
-    ],
-    "rice": {{"reach": 12, "impact": 3, "confidence": 0.8, "effort_label": "M", "effort": 2, "score": 144}},
-    "what_breaks": "Concise description of what fails and when",
-    "done_when": "Observable, testable completion criteria",
-    "next_step": "Concrete first engineering or design action"
-  }},
-  {{
-    "action": "exact action title verbatim",
-    "action_type": "feature",
-    "feedbacks": [
-      {{"text": "verbatim English quote"}}
-    ],
-    "rice": {{"reach": 6, "impact": 2, "confidence": 0.7, "effort_label": "L", "effort": 4, "score": 21}},
-    "user_story": "As a [user type], I want [specific thing] so that [concrete benefit]",
-    "acceptance_criteria": [
-      "Given [context], when [action], then [expected result]",
-      "Given [context], when [action], then [expected result]"
-    ]
-  }},
-  {{
-    "action": "exact action title verbatim",
-    "action_type": "ux",
-    "feedbacks": [
-      {{"text": "verbatim English quote"}}
-    ],
-    "rice": {{"reach": 5, "impact": 2, "confidence": 0.6, "effort_label": "S", "effort": 1, "score": 60}},
-    "problem": "Clear problem statement from the user's perspective",
-    "success_metric": "How you will measure that this is resolved",
-    "next_step": "Concrete first action (design, A/B test, research, etc.)"
-  }}
-]"""
+Return ONLY one valid JSON object, no markdown, no surrounding text:
+{{
+  "action": "exact action title verbatim",
+  "action_type": "bug",
+  "feedbacks": [
+    {{"text": "verbatim quote in original language", "translation": "English translation"}},
+    {{"text": "verbatim English quote"}}
+  ],
+  "rice": {{"reach": 12, "impact": 3, "confidence": 0.8, "effort_label": "M", "effort": 2, "score": 144}},
+  "what_breaks": "Concise description of what fails and when",
+  "done_when": "Observable, testable completion criteria",
+  "next_step": "Concrete first engineering or design action"
+}}"""
+            text, provider = await self._call_llm(prompt, max_tokens=4000)
+            card = _parse_card(text)
+            if card is None:
+                print(f"[generate_user_stories] parse error for {action!r}\nRaw output: {text[:500]}")
+                return None, provider
+            _normalize_rice(card)
+            return _attach_feedbacks(card, items, action), provider
 
-        text, fallback_provider = await self._call_llm(prompt, max_tokens=3000)
-        try:
-            clean = re.sub(r"```(?:json)?\s*\n?", "", text)
-            clean = re.sub(r"\n?```", "", clean).strip()
-            cards = json.loads(clean)
-            if not isinstance(cards, list):
-                raise ValueError
-            # Strip redundant English→English "translation" fields
-            def _norm(s: str) -> str:
-                return re.sub(r"[^a-z0-9]+", " ", s.lower()).strip()
-            for card in cards:
-                for fb in card.get("feedbacks", []) or []:
-                    tr = fb.get("translation")
-                    if tr and _norm(tr) == _norm(fb.get("text", "")):
-                        fb.pop("translation", None)
-            # Sort by RICE score descending
-            cards.sort(key=lambda c: c.get("rice", {}).get("score", 0), reverse=True)
-        except Exception as e:
-            print(f"[generate_user_stories] parse error: {e}\nRaw output: {text[:500]}")
-            cards = []
+        results = await asyncio.gather(
+            *[one(i, action) for i, action in enumerate(actions)],
+            return_exceptions=True,
+        )
+        cards: list[dict] = []
+        fallback_provider: str | None = None
+        for result in results:
+            if isinstance(result, Exception):
+                print(f"[generate_user_stories] card failed: {result}")
+                continue
+            card, provider = result
+            if provider and fallback_provider is None:
+                fallback_provider = provider
+            if card:
+                cards.append(card)
+        cards.sort(key=lambda c: c.get("rice", {}).get("score", 0), reverse=True)
         return cards, fallback_provider
 
     # ------------------------------------------------------------------

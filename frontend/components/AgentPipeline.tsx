@@ -40,16 +40,9 @@ const AGENTS: AgentDef[] = [
     model: "Cerebras · gpt-oss-120b",
   },
   {
-    id: "report",
-    name: "Penn",
-    role: "Reporter",
-    emoji: "🖊️",
-    model: "Gemini 3.1 Flash Lite",
-  },
-  {
     id: "stella",
     name: "Nova",
-    role: "Story Writer",
+    role: "Backlog Builder",
     emoji: "🃏",
     model: "Gemini 3.1 Flash Lite",
   },
@@ -66,15 +59,24 @@ interface AgentStat {
 }
 
 function deriveStatuses(step: AnalysisStep): Record<string, AgentStatus> {
-  const order = ["sift", "categorization", "clustering", "report", "stella"];
+  const order = ["sift", "categorization", "clustering", "stella"];
 
   const activeId =
     step.type === "sift" ? "sift"
     : step.type === "categorization" ? "categorization"
     : step.type === "clustering" ? "clustering"
-    : step.type === "report" ? "report"
     : step.type === "stella" ? "stella"
     : null;
+
+  // A restored backend can still emit "report". That step has no card.
+  if (step.type === "report") {
+    return {
+      sift: "done",
+      categorization: "done",
+      clustering: "done",
+      stella: "waiting",
+    };
+  }
 
   const statuses: Record<string, AgentStatus> = {};
   let foundActive = false;
@@ -154,7 +156,6 @@ const FALLBACK_CHAINS: Record<string, string> = {
   sift: "Cerebras · gpt-oss-120b → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Qwen 3.8 27B",
   categorization: "Gemini 3.1 Flash Lite → Groq · Qwen 3.8 27B → OpenRouter · auto",
   clustering: "Cerebras · gpt-oss-120b → Gemini 3.1 Flash Lite → Mistral Small → OpenRouter · auto → Groq · Qwen 3.8 27B",
-  report: "Gemini 3.1 Flash Lite → Cerebras · GLM 4.7 → Mistral Small → OpenRouter · auto → Groq · Qwen 3.8 27B",
   stella: "Gemini 3.1 Flash Lite → Cerebras · GLM 4.7 → Mistral Small → OpenRouter · auto → Groq · Qwen 3.8 27B",
 };
 
@@ -249,9 +250,6 @@ function AgentCard({
         <IrisProgressBar startedAt={step.startedAt} estimatedMs={step.estimatedMs} />
       )}
       {isActive && agent.id === "clustering" && step.type === "clustering" && (
-        <IrisProgressBar startedAt={step.startedAt} estimatedMs={step.estimatedMs} />
-      )}
-      {isActive && agent.id === "report" && step.type === "report" && (
         <IrisProgressBar startedAt={step.startedAt} estimatedMs={step.estimatedMs} />
       )}
       {isActive && agent.id === "stella" && step.type === "stella" && (
@@ -351,8 +349,6 @@ export default function AgentPipeline({
   siftedCount,
   irisFallback,
   irisFallbackProvider,
-  reportFallback,
-  reportFallbackProvider,
   cardsFallbackProvider,
   siftFallback,
   source,
@@ -364,8 +360,6 @@ export default function AgentPipeline({
   siftedCount?: number;
   irisFallback?: boolean;
   irisFallbackProvider?: string | null;
-  reportFallback?: boolean;
-  reportFallbackProvider?: string | null;
   cardsFallbackProvider?: string | null;
   siftFallback?: boolean;
   source?: PipelineSource;
@@ -387,14 +381,12 @@ export default function AgentPipeline({
   const fallbacks: Record<string, boolean> = {
     sift: siftFallback ?? false,
     categorization: irisFallback ?? false,
-    report: reportFallback ?? false,
     stella: cardsFallbackProvider != null,
   };
 
   const fallbackProviders: Record<string, string | null> = {
     sift: null,
     categorization: irisFallbackProvider ?? null,
-    report: reportFallbackProvider ?? null,
     stella: cardsFallbackProvider ?? null,
   };
 
@@ -405,7 +397,8 @@ export default function AgentPipeline({
       <p className="text-xs font-medium text-gray-400 mb-3 uppercase tracking-wide">
         Agent pipeline
       </p>
-      <div className="flex items-center gap-0">
+      <div className="overflow-x-auto">
+      <div className="flex items-center gap-0 min-w-[42rem]">
         {/* Source pill */}
         {source && (
           <>
@@ -441,6 +434,7 @@ export default function AgentPipeline({
             <JiraPill />
           </>
         )}
+      </div>
       </div>
     </div>
   );

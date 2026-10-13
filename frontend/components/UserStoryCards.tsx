@@ -254,7 +254,13 @@ const TYPE_META: Record<ActionType, { emoji: string; label: string; color: strin
 // RICE bar
 // ------------------------------------------------------------------
 
-const IMPACT_LABEL: Record<number, string> = { 1: "Low", 2: "Medium", 3: "High" };
+const IMPACT_LABEL: Record<number, string> = {
+  0.25: "Minimal",
+  0.5: "Low",
+  1: "Medium",
+  2: "High",
+  3: "Massive",
+};
 
 function RiceBar({ rice }: { rice: RiceScore }) {
   const confidencePct = Math.round(rice.confidence * 100);
@@ -269,8 +275,8 @@ function RiceBar({ rice }: { rice: RiceScore }) {
       {/* Impact */}
       <div className="bg-gray-50 rounded-lg px-2 py-2">
         <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Impact</p>
-        <p className="text-lg font-bold text-gray-800 leading-tight">{rice.impact}<span className="text-xs text-gray-400 font-normal">/3</span></p>
-        <p className="text-xs text-gray-400">{IMPACT_LABEL[rice.impact]}</p>
+        <p className="text-lg font-bold text-gray-800 leading-tight">{rice.impact}</p>
+        <p className="text-xs text-gray-400">{IMPACT_LABEL[rice.impact] ?? ""}</p>
       </div>
       {/* Confidence */}
       <div className="bg-gray-50 rounded-lg px-2 py-2">
@@ -391,7 +397,7 @@ export default function UserStoryCards({ cards }: { cards: UserStoryCard[] }) {
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-900">Sprint cards · sorted by RICE score</h2>
         <a
-          href="https://triage-mvp.atlassian.net/jira/software/projects/SCRUM/boards"
+          href="https://triagemvp.atlassian.net/jira/software/projects/SCRUM/boards"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"

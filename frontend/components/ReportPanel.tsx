@@ -6,15 +6,6 @@ import { AnalysisResult, FeedbackItem } from "@/lib/types";
 // Shared helpers
 // ------------------------------------------------------------------
 
-function StatPill({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${color}`}>
-      <span>{value}</span>
-      <span className="opacity-70">{label}</span>
-    </div>
-  );
-}
-
 function renderMarkdown(text: string) {
   const lines = text.split("\n");
   return lines.map((line, i) => {
@@ -32,7 +23,7 @@ function renderMarkdown(text: string) {
 }
 
 function downloadCSV(items: FeedbackItem[]) {
-  const headers = ["id", "original", "summary", "category", "priority", "priority_reason", "cluster_label"];
+  const headers = ["id", "original", "summary", "category", "cluster_label"];
   const rows = items.map((item) =>
     headers.map((h) => `"${String(item[h as keyof FeedbackItem] ?? "").replace(/"/g, '""')}"`).join(",")
   );
@@ -51,26 +42,15 @@ function downloadCSV(items: FeedbackItem[]) {
 // ------------------------------------------------------------------
 
 export function FeedbackStats({ items }: { items: FeedbackItem[] }) {
-  const high = items.filter((i) => i.priority === "High").length;
-  const medium = items.filter((i) => i.priority === "Medium").length;
-  const low = items.filter((i) => i.priority === "Low").length;
-
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-900">{items.length} feedbacks analyzed</h2>
-        <button
-          onClick={() => downloadCSV(items)}
-          className="text-xs text-indigo-600 hover:underline font-medium"
-        >
-          Export CSV
-        </button>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <StatPill label="High" value={high} color="bg-red-100 text-red-700" />
-        <StatPill label="Medium" value={medium} color="bg-amber-100 text-amber-700" />
-        <StatPill label="Low" value={low} color="bg-emerald-100 text-emerald-700" />
-      </div>
+    <div className="flex items-center justify-between">
+      <h2 className="text-sm font-semibold text-gray-900">{items.length} feedbacks analyzed</h2>
+      <button
+        onClick={() => downloadCSV(items)}
+        className="text-xs text-indigo-600 hover:underline font-medium"
+      >
+        Export CSV
+      </button>
     </div>
   );
 }
@@ -84,6 +64,7 @@ export function FallbackBanner({ used_fallback, report_fallback }: { used_fallba
   );
 }
 
+// Parked with backend/parked_report.py. The home page no longer renders this.
 export function ExecutiveReport({ report }: { report: string }) {
   if (!report) return null;
   return (
@@ -110,7 +91,7 @@ export function IrisCorrections({ result }: { result: AnalysisResult }) {
       <div className="space-y-1.5 mt-2">
         {corrections.length === 0 ? (
           <p className="text-xs text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg">
-            ✓ All {items.length} feedbacks reviewed across category and priority — no corrections needed.
+            ✓ All {items.length} feedbacks reviewed across category — no corrections needed.
           </p>
         ) : (
           corrections.map((c, i) => (

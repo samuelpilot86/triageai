@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import InputPanel from "@/components/InputPanel";
 import FeedbackTable from "@/components/FeedbackTable";
-import { ExecutiveReport, FeedbackStats, FallbackBanner, IrisCorrections } from "@/components/ReportPanel";
+import { FeedbackStats, FallbackBanner, IrisCorrections } from "@/components/ReportPanel";
 import UserStoryCards from "@/components/UserStoryCards";
 import AgentPipeline, { PipelineSource } from "@/components/AgentPipeline";
 import { useAnalysis } from "@/lib/useAnalysis";
@@ -20,7 +20,7 @@ export default function Home() {
 
   // Persist pipeline metadata across step transitions
   // Use the actionable count (from sifted event) once available, else fall back to raw nFeedbacks
-  if (step.type === "categorization" || step.type === "clustering" || step.type === "report" || step.type === "stella" || step.type === "done") {
+  if (step.type === "categorization" || step.type === "clustering" || step.type === "stella" || step.type === "done") {
     const actionable = actionableCountRef.current;
     if (actionable !== null) {
       pipelineMetaRef.current.siftedCount = actionable;
@@ -158,8 +158,6 @@ disabled={isRunning}
                   undefined
                 }
                 irisFallbackProvider={step.type === "done" ? step.result.iris_fallback_provider : undefined}
-                reportFallback={step.type === "done" ? step.result.report_fallback : undefined}
-                reportFallbackProvider={step.type === "done" ? step.result.report_fallback_provider : undefined}
                 cardsFallbackProvider={step.type === "done" ? step.result.cards_fallback_provider : undefined}
                 source={sourceRef.current}
                 estimates={allEstimatesRef.current}
@@ -169,13 +167,6 @@ disabled={isRunning}
 
           {step.type === "done" && (
             <>
-              {/* 2 — Executive Report */}
-              {step.result.report && (
-                <section>
-                  <ExecutiveReport report={step.result.report} />
-                </section>
-              )}
-
               {/* Sprint cards */}
               {step.result.user_story_cards.length > 0 && (
                 <section>
@@ -199,9 +190,6 @@ disabled={isRunning}
             <section className="space-y-2">
               <h2 className="text-sm font-medium text-gray-500">
                 Actionable feedbacks
-                {isRunning && step.type === "report" && (
-                  <span className="ml-2 text-xs text-indigo-500 animate-pulse">Generating report…</span>
-                )}
               </h2>
               <FeedbackTable
                 items={partialItems}

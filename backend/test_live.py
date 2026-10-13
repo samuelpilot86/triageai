@@ -29,7 +29,7 @@ TEST_FEEDBACKS = [
     "Onboarding is confusing, I had no idea how to create my first project.",
 ]
 
-EXPECTED_EVENTS = {"sifted", "categorization", "clustered", "report", "done"}
+EXPECTED_EVENTS = {"sifted", "categorization", "clustered", "user_stories", "done"}
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ def _print_event(name: str, data: dict) -> None:
         print(f"  → [{name}] {data.get('count')} clusters")
     elif name == "report":
         snippet = (data.get("text") or "")[:80].replace("\n", " ")
-        print(f"  → [{name}] {snippet}…")
+        print(f"  → [{name}] parked event still received: {snippet}…")
     elif name == "user_stories":
         print(f"  → [{name}] {len(data.get('cards', []))} cards")
     elif name == "done":
@@ -143,10 +143,10 @@ def assert_events(events: list[tuple[str, dict]]) -> bool:
         print("\n✗ categorization returned 0 items")
         ok = False
 
-    # report text non-empty
-    reports = [d for e, d in events if e == "report"]
-    if reports and not (reports[0].get("text") or "").strip():
-        print("\n✗ report text is empty")
+    # one card per cluster, at least
+    stories = [d for e, d in events if e == "user_stories"]
+    if stories and len(stories[0].get("cards") or []) == 0:
+        print("\n✗ user_stories returned 0 cards")
         ok = False
 
     return ok

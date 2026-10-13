@@ -2,11 +2,6 @@
 
 import { FeedbackItem } from "@/lib/types";
 
-const PRIORITY_BADGE: Record<string, string> = {
-  High: "bg-red-100 text-red-700",
-  Medium: "bg-amber-100 text-amber-700",
-  Low: "bg-emerald-100 text-emerald-700",
-};
 const CATEGORY_EMOJI: Record<string, string> = {
   "Bug / Error": "🐛",
   "Feature Request": "✨",
@@ -31,8 +26,6 @@ function SkeletonRow({ index }: { index: number }) {
         <div className="h-2 w-40 bg-gray-100 rounded" />
       </td>
       <td className="px-4 py-3"><div className="h-3 w-24 bg-gray-200 rounded" /></td>
-      <td className="px-4 py-3"><div className="h-5 w-14 bg-gray-200 rounded-full" /></td>
-      <td className="px-4 py-3"><div className="h-2 w-28 bg-gray-100 rounded" /></td>
       <td className="px-4 py-3"><div className="h-5 w-16 bg-gray-200 rounded-full" /></td>
     </tr>
   );
@@ -59,8 +52,6 @@ export default function FeedbackTable({
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 w-8">#</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Summary</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Category</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Priority</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Reason</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Group</th>
               </tr>
             </thead>
@@ -77,14 +68,6 @@ export default function FeedbackTable({
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                     {CATEGORY_EMOJI[item.category ?? ""] ?? "📌"} {item.category}
                   </td>
-                  <td className="px-4 py-3">
-                    {item.priority && (
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${PRIORITY_BADGE[item.priority] ?? ""}`}>
-                        {item.priority}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{item.priority_reason}</td>
                   <td className="px-4 py-3">
                     {item.cluster_label ? (
                       <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600 max-w-[160px] truncate" title={item.cluster_label}>

@@ -144,16 +144,11 @@ async def analysis_stream(feedbacks: list[str], app_name: str | None = None) -> 
     # Items now have cluster_id and cluster_label — emit items immediately
     yield sse_event("clustered", {"count": len(clusters), "items": items})
 
-    # 4. Penn
-    yield sse_event("status", {"step": "report", "message": "Generating executive report…"})
-    try:
-        report, actions, report_fallback = await agent.generate_report(items, clusters, app_name=app_name)
-    except Exception as e:
-        yield sse_event("error", {"message": str(e)})
-        return
-    yield sse_event("report", {"text": report, "used_fallback": report_fallback is not None, "fallback_provider": report_fallback})
+    # Penn (executive report) is parked in parked_report.py.
+    # One card per cluster; the cluster label is the action title until grouping writes its own.
+    actions = [c.get("cluster_label") or "Untitled" for c in clusters]
 
-    # 5. Nova
+    # 4. Nova
     if actions:
         yield sse_event("status", {"step": "stella", "message": "Generating user story cards…"})
         try:
@@ -310,8 +305,8 @@ async def create_jira_issue(payload: dict):
     import base64
     import httpx
 
-    domain = os.environ.get("JIRA_DOMAIN", "triage-mvp.atlassian.net")
-    email = os.environ.get("JIRA_EMAIL", "samuelpilotbasse@gmail.com")
+    domain = os.environ.get("JIRA_DOMAIN", "triagemvp.atlassian.net")
+    email = os.environ.get("JIRA_EMAIL", "samuel.pilot@mines-paris.org")
     token = os.environ.get("JIRA_API_TOKEN", "")
     project_key = os.environ.get("JIRA_PROJECT_KEY", "SCRUM")
 
@@ -324,10 +319,6 @@ async def create_jira_issue(payload: dict):
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
-
-    # Map trIAge priority to Jira priority
-    priority_map = {"High": "High", "Medium": "Medium", "Low": "Low"}
-    jira_priority = priority_map.get(payload.get("priority", "Medium"), "Medium")
 
     # Map action_type to Jira issue type
     type_map = {
@@ -371,11 +362,13 @@ async def create_jira_issue(payload: dict):
 
     if payload.get("rice"):
         rice = payload["rice"]
-        rice_text = f"RICE score: {rice.get('score')} — Reach: {rice.get('reach')}, Impact: {rice.get('impact')}/3, Confidence: {int(rice.get('confidence', 0)*100)}%, Effort: {rice.get('effort_label')}"
+        impact_label = {0.25: "minimal", 0.5: "low", 1: "medium", 2: "high", 3: "massive"}.get(rice.get("impact"), "")
+        impact_text = f"{rice.get('impact')} ({impact_label})" if impact_label else str(rice.get("impact"))
+        rice_text = f"RICE score: {rice.get('score')} — Reach: {rice.get('reach')}, Impact: {impact_text}, Confidence: {int(rice.get('confidence', 0)*100)}%, Effort: {rice.get('effort_label')}"
         desc_content.append({"type": "paragraph", "content": [{"type": "text", "text": rice_text, "marks": [{"type": "em"}]}]})
 
     if payload.get("feedbacks"):
-        fb_items = [{"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": f['text'] if isinstance(f, dict) else f}]}]} for f in payload["feedbacks"][:3]]
+        fb_items = [{"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": f['text'] if isinstance(f, dict) else f}]}]} for f in payload["feedbacks"]]
         desc_content += [
             {"type": "paragraph", "content": [{"type": "text", "text": "Supporting feedbacks", "marks": [{"type": "strong"}]}]},
             {"type": "bulletList", "content": fb_items},
@@ -387,7 +380,6 @@ async def create_jira_issue(payload: dict):
             "summary": payload.get("action", "Untitled"),
             "description": {"type": "doc", "version": 1, "content": desc_content or [{"type": "paragraph", "content": [{"type": "text", "text": "Created by trIAge."}]}]},
             "issuetype": {"name": issue_type},
-            "priority": {"name": jira_priority},
         }
     }
 

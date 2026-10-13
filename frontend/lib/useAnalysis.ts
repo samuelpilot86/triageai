@@ -10,7 +10,6 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7860";
 // ------------------------------------------------------------------
 
 const FALLBACK_MS_PER_FEEDBACK = 200;
-const FALLBACK_REPORT_MS = 15_000;
 
 // Must stay in sync with backend agent.py constants
 const SIFT_CHUNK_SIZE = 25;
@@ -234,7 +233,11 @@ export function useAnalysis() {
       else if (s === "stella") {
         const startedAt = Date.now();
         stellaStartRef.current = startedAt;
-        // Record Penn timing (report event fires before stella status)
+        if (clusteringStartRef.current !== null) {
+          const elapsed = startedAt - clusteringStartRef.current;
+          recordTiming("clustering", elapsed);
+          clusteringStartRef.current = null;
+        }
         fetchTimingEstimate("stella").then((estimatedMs) => {
           setStep((prev) => prev.type === "stella" ? { ...prev, estimatedMs } : prev);
         });
@@ -267,7 +270,7 @@ export function useAnalysis() {
       irisFallbackProviderRef.current = (d.fallback_provider as string | null) ?? null;
       setStep((prev) => prev.type === "categorization" ? { ...prev, usedFallback: fallback } : prev);
     } else if (event === "report") {
-      // Penn finished — record timing
+      // Parked report event, if a restored backend still emits it.
       if (reportStartRef.current !== null) {
         const elapsed = Date.now() - reportStartRef.current;
         recordTiming("report", elapsed);
@@ -292,7 +295,11 @@ export function useAnalysis() {
         return items;
       });
     } else if (event === "done") {
-      // Final signal from backend — handles the no-actions case where Nova is skipped
+      if (clusteringStartRef.current !== null) {
+        recordTiming("clustering", Date.now() - clusteringStartRef.current);
+        clusteringStartRef.current = null;
+      }
+      // Final signal from backend — covers a run that produced no cards
       setPartialItems((items) => {
         setStep({ type: "done", result: buildResult(items) });
         return items;
@@ -304,7 +311,7 @@ export function useAnalysis() {
 
   // Pre-fetch all step estimates at analysis launch so they can be shown upfront
   const prefetchAllEstimates = useCallback(async (n: number) => {
-    const steps: TimingStep[] = ["sift", "categorization", "clustering", "report", "stella"];
+    const steps: TimingStep[] = ["sift", "categorization", "clustering", "stella"];
     const results = await Promise.all(steps.map((s) => fetchTimingEstimate(s, n)));
     const estimates: Partial<Record<TimingStep, number>> = {};
     steps.forEach((s, i) => { estimates[s] = results[i]; });

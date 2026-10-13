@@ -20,7 +20,7 @@ const AGENTS = [
     name: "Iris",
     role: "Categorizer",
     model: "Gemini 3.1 Flash Lite",
-    desc: "Classifies, prioritizes & self-corrects in a single structured call",
+    desc: "Assigns a category and a short summary, then reviews its own labels",
     modelClass: "gemini",
   },
   {
@@ -28,23 +28,15 @@ const AGENTS = [
     name: "Echo",
     role: "Cluster Analyst",
     model: "Cerebras · gpt-oss-120b",
-    desc: "LLM-driven semantic clustering — one cluster = one Jira ticket, scored by volume & severity",
+    desc: "Groups feedbacks that describe the same issue — one group, one ticket",
     modelClass: "cerebras",
-  },
-  {
-    emoji: "🖊️",
-    name: "Penn",
-    role: "Reporter",
-    model: "Gemini 3.1 Flash Lite",
-    desc: "Synthesizes top clusters into a PM executive report with prioritized recommendations",
-    modelClass: "gemini",
   },
   {
     emoji: "🃏",
     name: "Nova",
     role: "Backlog Builder",
     model: "Gemini 3.1 Flash Lite",
-    desc: "Generates RICE-scored sprint cards with US and acceptance criteria, ready for Jira",
+    desc: "Writes one RICE-scored card per group, with every supporting feedback, ready for Jira",
     modelClass: "gemini",
   },
 ];
@@ -70,13 +62,6 @@ const MODEL_ROUTING = [
     badge: "Cerebras · gpt-oss-120b",
     badgeClass: "bg-orange-100 text-orange-800",
     why: "LLM clustering over summaries — small, semantically rich input. gpt-oss-120b's reasoning is more than enough for coherent grouping, and Cerebras' 1M tokens/day headroom means clustering never becomes the bottleneck on repeated runs.",
-  },
-  {
-    agent: "Penn",
-    emoji: "🖊️",
-    badge: "Gemini 3.1 Flash Lite",
-    badgeClass: "bg-indigo-100 text-indigo-800",
-    why: "Narrative synthesis for a stakeholder-facing report calls for fluent, structured prose — Gemini 3.1 Flash Lite consistently produces well-argued, PM-ready summaries. Its generous daily quota means report generation is never the bottleneck.",
   },
   {
     agent: "Nova",
@@ -178,7 +163,7 @@ export default function AboutPage() {
         <section>
           <SectionLabel>Architecture</SectionLabel>
           <h2 className="text-xl font-bold text-gray-900 mb-2">
-            Five specialized agents, one coordinated pipeline
+            Four specialized agents, one coordinated pipeline
           </h2>
           <p className="text-sm text-gray-500 mb-5 leading-relaxed">
             Each agent has a single responsibility, making it easy to spot errors and tune prompts.
@@ -186,7 +171,8 @@ export default function AboutPage() {
           </p>
 
           {/* Pipeline flow with sources and Jira output */}
-          <div className="flex items-center gap-0 bg-white rounded-2xl border border-gray-200 p-4">
+          <div className="overflow-x-auto">
+          <div className="flex items-center gap-0 bg-white rounded-2xl border border-gray-200 p-4 min-w-[42rem]">
 
             {/* Input sources — stacked vertically */}
             <div className="flex flex-col items-center gap-1.5 shrink-0">
@@ -226,6 +212,7 @@ export default function AboutPage() {
             {/* Jira output */}
             <JiraPill />
           </div>
+          </div>
         </section>
 
         {/* ── Model routing ── */}
@@ -239,7 +226,7 @@ export default function AboutPage() {
           </p>
           <ul className="text-sm text-gray-500 mb-6 space-y-1 pl-4">
             <li className="list-disc leading-relaxed">Cerebras handles the fast filtering and clustering steps, leveraging its high-throughput inference.</li>
-            <li className="list-disc leading-relaxed">Gemini 3.1 Flash Lite drives all generation steps — categorization, report and sprint cards — combining strong reasoning with reliable availability.</li>
+            <li className="list-disc leading-relaxed">Gemini 3.1 Flash Lite drives the generation steps — categorization and sprint cards — combining strong reasoning with reliable availability.</li>
             <li className="list-disc leading-relaxed">Groq · Qwen 3.8 27B is the last-resort fallback: a dense 27B successor to Qwen 3.6, used in instruct mode so structured JSON stays intact when primary providers are down. For Iris it is the first fallback after Gemini; on the other steps it sits after Cerebras, Mistral and OpenRouter.</li>
           </ul>
 
@@ -288,8 +275,7 @@ export default function AboutPage() {
               <div className="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-2">Phase 1 — Classify</div>
               <div className="text-sm font-semibold text-gray-900 mb-2">First pass</div>
               <p className="text-xs text-gray-500 leading-relaxed">
-                For each feedback: assign category, priority (High / Medium / Low),
-                sentiment, and an actionability flag that filters out noise with no product signal.
+                For each feedback: assign a category and a short summary.
               </p>
             </div>
             <div className="rounded-xl border border-gray-200 bg-white p-4">
@@ -297,7 +283,7 @@ export default function AboutPage() {
               <div className="text-sm font-semibold text-gray-900 mb-2">Critique & correct</div>
               <p className="text-xs text-gray-500 leading-relaxed">
                 Iris reviews its own decisions — checks for inconsistencies across similar feedbacks,
-                corrects mislabeled priorities or categories, and logs every change made.
+                corrects a mislabeled category, and logs every change made.
               </p>
             </div>
           </div>
