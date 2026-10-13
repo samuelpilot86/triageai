@@ -132,12 +132,17 @@ export default function AboutPage() {
               <p className="text-xs text-gray-400">Product feedback triage for PMs, powered by AI agents</p>
             </div>
           </div>
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            ⚡ Try the app
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/eval" className="text-xs text-gray-500 hover:text-gray-800 transition-colors">
+              Evaluation
+            </Link>
+            <Link
+              href="/"
+              className="flex items-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              ⚡ Try the app
+            </Link>
+          </div>
         </div>
       </header>
 

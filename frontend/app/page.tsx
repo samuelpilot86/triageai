@@ -60,6 +60,9 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <Link href="/eval" className="text-xs text-gray-500 hover:text-gray-800 transition-colors">
+              Evaluation
+            </Link>
             <Link
               href="/about"
               className="flex items-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors"

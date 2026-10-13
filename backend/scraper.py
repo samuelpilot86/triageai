@@ -6,6 +6,8 @@ with respect to their Terms of Service. This module is intended exclusively for
 non-commercial use, for research and demonstration purposes (portfolio MVP).
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import time

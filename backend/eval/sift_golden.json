@@ -1,0 +1,25 @@
+{
+  "version": "sample-1",
+  "items": [
+    {"id": 1, "text": "The app crashes when I open settings.", "actionable": true, "reason": "Specific crash."},
+    {"id": 2, "text": "Great app, but it crashes on launch.", "actionable": true, "reason": "Mixed review. The crash is a product signal, so the whole review stays."},
+    {"id": 3, "text": "Please add dark mode.", "actionable": true, "reason": "Feature request."},
+    {"id": 4, "text": "The checkout button is hidden behind the keyboard.", "actionable": true, "reason": "Specific usability problem."},
+    {"id": 5, "text": "Login fails with error 403 after the last update.", "actionable": true, "reason": "Reproducible failure."},
+    {"id": 6, "text": "Search returns no results for words that are in the document.", "actionable": true, "reason": "Specific bug."},
+    {"id": 7, "text": "Export to CSV would save me an hour a week.", "actionable": true, "reason": "Feature request."},
+    {"id": 8, "text": "Notifications arrive twice for the same message.", "actionable": true, "reason": "Reproducible bug."},
+    {"id": 9, "text": "I can't reset my password. The email never arrives.", "actionable": true, "reason": "Broken flow."},
+    {"id": 10, "text": "The map stays blank on Android 14.", "actionable": true, "reason": "Reproducible bug on a named platform."},
+    {"id": 11, "text": "Love this app!!!", "actionable": false, "reason": "Generic praise."},
+    {"id": 12, "text": "asdf jkl;", "actionable": false, "reason": "Gibberish."},
+    {"id": 13, "text": "I had pasta for lunch.", "actionable": false, "reason": "Off topic."},
+    {"id": 14, "text": "This update ruined my day.", "actionable": false, "reason": "Vague emotion, no product signal."},
+    {"id": 15, "text": "Best thing ever, five stars.", "actionable": false, "reason": "Generic praise."},
+    {"id": 16, "text": "So frustrating.", "actionable": false, "reason": "Vague emotion, no product signal."},
+    {"id": 17, "text": "My cat walked on the keyboard.", "actionable": false, "reason": "Off topic."},
+    {"id": 18, "text": "Thanks, very nice.", "actionable": false, "reason": "Generic praise."},
+    {"id": 19, "text": "Worst app.", "actionable": false, "reason": "No specific problem."},
+    {"id": 20, "text": "🔥🔥🔥", "actionable": false, "reason": "No product signal."}
+  ]
+}

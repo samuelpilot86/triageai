@@ -3,6 +3,8 @@ main.py — FastAPI backend for trIAge.
 Exposes SSE streaming for analysis + REST endpoints for store data.
 """
 
+from __future__ import annotations
+
 import os
 import json
 import asyncio
@@ -20,7 +22,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 import pandas as pd
 
-from agent import FeedbackTriageAgent
+from agent import SIFT_CHUNK_SIZE, FeedbackTriageAgent
+from sift_eval import load_golden, score_sift
 from scraper import (
     APP_STORE_CATEGORIES,
     GOOGLE_PLAY_CATEGORIES,
@@ -412,6 +415,83 @@ async def create_jira_issue(payload: dict):
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/eval/sift")
+async def get_sift_eval_set():
+    """The frozen review set and the contract. No model call."""
+    golden = load_golden()
+    items = golden["items"]
+    return {
+        "version": golden["version"],
+        "contract_size": 200,
+        "recall_min": 0.95,
+        "precision_min": 0.90,
+        "item_count": len(items),
+        "actionable_count": sum(1 for item in items if item["actionable"]),
+        "chunk_count": (len(items) + SIFT_CHUNK_SIZE - 1) // SIFT_CHUNK_SIZE if items else 0,
+        "items": items,
+    }
+
+
+async def _sift_eval_stream(agent: FeedbackTriageAgent) -> AsyncGenerator[str, None]:
+    golden = load_golden()
+    items = golden["items"]
+    texts = [item["text"] for item in items]
+    chunks = [texts[i:i + SIFT_CHUNK_SIZE] for i in range(0, len(texts), SIFT_CHUNK_SIZE)]
+    total = len(chunks)
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def one(index: int, chunk: list[str]):
+        outcome = await agent._sift_chunk(chunk, index * SIFT_CHUNK_SIZE)
+        await queue.put(("progress", index))
+        return index, outcome
+
+    async def run_all():
+        try:
+            results = await asyncio.gather(*[one(i, chunk) for i, chunk in enumerate(chunks)])
+            await queue.put(("done", results))
+        except Exception as exc:
+            await queue.put(("error", str(exc)))
+
+    asyncio.create_task(run_all())
+    finished = 0
+    yield sse_event("status", {"done": 0, "total": total})
+    results = None
+    while True:
+        kind, payload = await queue.get()
+        if kind == "progress":
+            finished += 1
+            yield sse_event("status", {"done": finished, "total": total})
+        elif kind == "error":
+            yield sse_event("error", {"message": payload})
+            return
+        else:
+            results = payload
+            break
+
+    predicted: set[int] = set()
+    failed_ids: set[int] = set()
+    failed_chunks: list[dict] = []
+    for index, (actionable, _non_actionable, decided) in results:
+        chunk_ids = list(range(index * SIFT_CHUNK_SIZE + 1, index * SIFT_CHUNK_SIZE + 1 + len(chunks[index])))
+        if decided:
+            predicted.update(source_id for source_id, _text in actionable)
+        else:
+            failed_ids.update(chunk_ids)
+            failed_chunks.append({"index": index + 1, "size": len(chunk_ids)})
+    yield sse_event("result", score_sift(items, predicted, failed_ids, failed_chunks, golden["version"]))
+
+
+@app.post("/api/eval/sift/run")
+async def run_sift_eval():
+    """Run the production Sift filter on the frozen set and stream the score."""
+    agent = get_agent()
+    return StreamingResponse(
+        _sift_eval_stream(agent),
+        media_type="text/event-stream",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
 
 
 # ------------------------------------------------------------------

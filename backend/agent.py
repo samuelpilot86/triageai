@@ -14,6 +14,8 @@ Model routing:
   The executive report (Penn) lives in parked_report.py and is not called.
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import re
@@ -534,15 +536,17 @@ IMPORTANT RULES FOR CORRECTIONS:
 
         actionable: list[tuple[int, str]] = []
         non_actionable: list[str] = []
-        for a, na in chunk_results:
+        for a, na, _decided in chunk_results:
             actionable.extend(a)
             non_actionable.extend(na)
         return actionable, non_actionable
 
-    async def _sift_chunk(self, chunk: list[str], global_offset: int) -> tuple[list[tuple[int, str]], list[str]]:
+    async def _sift_chunk(self, chunk: list[str], global_offset: int) -> tuple[list[tuple[int, str]], list[str], bool]:
         """
         Sift a single chunk of feedbacks. IDs in the prompt are local (1-based);
         results are mapped back using global_offset.
+        The third value is False when the call or the parse failed and every
+        review in the chunk was kept without a model decision.
         """
         numbered = "\n".join(f"{i + 1}. {f}" for i, f in enumerate(chunk))
         prompt = f"""You are filtering product feedback for a PM. Return ONLY a JSON array of IDs (integers) for feedbacks that are actionable — meaning they contain a specific bug, feature request, UX issue, or reproducible problem. Exclude: generic praise ("great app"), gibberish, off-topic content, or vague emotional reactions with no product signal.
@@ -559,7 +563,7 @@ Return ONLY valid JSON array of integers, e.g.: [1, 3, 5]"""
             )
         except Exception as e:
             _logging.getLogger("triage").warning("_sift_chunk(offset=%d): call failed, treating all as actionable. Error: %s", global_offset, e)
-            return [(global_offset + i, f) for i, f in enumerate(chunk, 1)], []
+            return [(global_offset + i, f) for i, f in enumerate(chunk, 1)], [], False
 
         try:
             clean = re.sub(r"```(?:json)?\s*\n?", "", text)
@@ -568,11 +572,11 @@ Return ONLY valid JSON array of integers, e.g.: [1, 3, 5]"""
             actionable_ids = set(json.loads(m.group(0) if m else clean))
         except Exception:
             _logging.getLogger("triage").warning("_sift_chunk(offset=%d): parse failed, treating all as actionable. Raw: %s", global_offset, text[:200])
-            return [(global_offset + i, f) for i, f in enumerate(chunk, 1)], []
+            return [(global_offset + i, f) for i, f in enumerate(chunk, 1)], [], False
 
         actionable = [(global_offset + i, f) for i, f in enumerate(chunk, 1) if i in actionable_ids]
         non_actionable = [f for i, f in enumerate(chunk, 1) if i not in actionable_ids]
-        return actionable, non_actionable
+        return actionable, non_actionable, True
 
     # ------------------------------------------------------------------
     # Echo — LLM-based clustering
