@@ -23,7 +23,7 @@ function renderMarkdown(text: string) {
 }
 
 function downloadCSV(items: FeedbackItem[]) {
-  const headers = ["id", "original", "summary", "category", "cluster_label"];
+  const headers = ["id", "source_id", "action", "excerpt", "original", "summary", "category", "cluster_label"];
   const rows = items.map((item) =>
     headers.map((h) => `"${String(item[h as keyof FeedbackItem] ?? "").replace(/"/g, '""')}"`).join(",")
   );
@@ -42,9 +42,15 @@ function downloadCSV(items: FeedbackItem[]) {
 // ------------------------------------------------------------------
 
 export function FeedbackStats({ items }: { items: FeedbackItem[] }) {
+  const sources = new Set(
+    items.flatMap((item) => (typeof item.source_id === "number" ? [item.source_id] : []))
+  );
+  const count = sources.size > 0 ? sources.size : items.length;
   return (
     <div className="flex items-center justify-between">
-      <h2 className="text-sm font-semibold text-gray-900">{items.length} feedbacks analyzed</h2>
+      <h2 className="text-sm font-semibold text-gray-900">
+        {count} {count === 1 ? "feedback" : "feedbacks"} analyzed
+      </h2>
       <button
         onClick={() => downloadCSV(items)}
         className="text-xs text-indigo-600 hover:underline font-medium"
@@ -86,12 +92,12 @@ export function IrisCorrections({ result }: { result: AnalysisResult }) {
     <details className="space-y-1.5 group">
       <summary className="cursor-pointer list-none text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-700 select-none">
         <span className="inline-block transition-transform group-open:rotate-90 mr-1">▸</span>
-        Iris self-corrections {corrections.length > 0 ? `(${corrections.length})` : `(0 — all ${items.length} feedbacks OK)`}
+        Iris self-corrections {corrections.length > 0 ? `(${corrections.length})` : `(0 — all ${items.length} elements OK)`}
       </summary>
       <div className="space-y-1.5 mt-2">
         {corrections.length === 0 ? (
           <p className="text-xs text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg">
-            ✓ All {items.length} feedbacks reviewed across category — no corrections needed.
+            ✓ All {items.length} elements reviewed across category — no corrections needed.
           </p>
         ) : (
           corrections.map((c, i) => (

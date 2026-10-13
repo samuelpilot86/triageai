@@ -1,6 +1,6 @@
 "use client";
 
-import { FeedbackItem } from "@/lib/types";
+import { FeedbackItem, UnclearElement } from "@/lib/types";
 
 const CATEGORY_EMOJI: Record<string, string> = {
   "Bug / Error": "🐛",
@@ -34,13 +34,15 @@ function SkeletonRow({ index }: { index: number }) {
 export default function FeedbackTable({
   items,
   nonActionableItems = [],
+  unclearItems = [],
   skeletonCount = 0,
 }: {
   items: FeedbackItem[];
   nonActionableItems?: string[];
+  unclearItems?: UnclearElement[];
   skeletonCount?: number;
 }) {
-  if (!items.length && skeletonCount === 0 && !nonActionableItems.length) return null;
+  if (!items.length && skeletonCount === 0 && !nonActionableItems.length && !unclearItems.length) return null;
 
   return (
     <div className="space-y-4">
@@ -50,7 +52,7 @@ export default function FeedbackTable({
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 w-8">#</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Summary</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Action</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Category</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Group</th>
               </tr>
@@ -60,10 +62,18 @@ export default function FeedbackTable({
                 <tr key={item.id} className="transition-colors group hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-400 text-xs">{item.id}</td>
                   <td className="px-4 py-3">
-                    <span className="font-medium text-gray-800">{item.summary}</span>
-                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-1 group-hover:line-clamp-none transition-all">
-                      {item.original}
+                    <span className="font-medium text-gray-800">{item.action || item.summary}</span>
+                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 group-hover:line-clamp-none transition-all">
+                      {item.excerpt || item.original}
                     </p>
+                    {item.excerpt && item.original && item.excerpt !== item.original && (
+                      <details className="mt-1">
+                        <summary className="text-[11px] text-gray-400 cursor-pointer select-none">
+                          {item.source_id != null ? `Feedback #${item.source_id}` : "Full feedback"}
+                        </summary>
+                        <p className="text-xs text-gray-400 mt-1">{item.original}</p>
+                      </details>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                     {CATEGORY_EMOJI[item.category ?? ""] ?? "📌"} {item.category}
@@ -85,6 +95,35 @@ export default function FeedbackTable({
             </tbody>
           </table>
         </div>
+      )}
+
+      {unclearItems.length > 0 && (
+        <details className="rounded-xl border border-gray-200 overflow-hidden">
+          <summary className="bg-gray-50 px-4 py-3 text-xs font-medium text-gray-500 cursor-pointer select-none hover:bg-gray-100 transition-colors">
+            Not specific enough ({unclearItems.length})
+          </summary>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 w-8">#</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Excerpt</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {unclearItems.map((item, i) => (
+                  <tr key={i} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-gray-400 text-xs">{item.source_id}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">
+                      {item.excerpt}
+                      {item.reason && <p className="text-gray-400 mt-0.5">{item.reason}</p>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
       )}
 
       {nonActionableItems.length > 0 && (

@@ -20,7 +20,7 @@ const AGENTS = [
     name: "Iris",
     role: "Categorizer",
     model: "Gemini 3.1 Flash Lite",
-    desc: "Assigns a category and a short summary, then reviews its own labels",
+    desc: "Names one shippable action per excerpt, and sets aside what it cannot name",
     modelClass: "gemini",
   },
   {
@@ -28,7 +28,7 @@ const AGENTS = [
     name: "Echo",
     role: "Cluster Analyst",
     model: "Cerebras · gpt-oss-120b",
-    desc: "Groups feedbacks that describe the same issue — one group, one ticket",
+    desc: "Groups excerpts that ask for the same shippable action — one group, one ticket",
     modelClass: "cerebras",
   },
   {
@@ -36,7 +36,7 @@ const AGENTS = [
     name: "Nova",
     role: "Backlog Builder",
     model: "Gemini 3.1 Flash Lite",
-    desc: "Writes one RICE-scored card per group, with every supporting feedback, ready for Jira",
+    desc: "Writes one RICE-scored card per group and quotes each excerpt, ready for Jira",
     modelClass: "gemini",
   },
 ];
@@ -47,21 +47,21 @@ const MODEL_ROUTING = [
     emoji: "🎯",
     badge: "Cerebras · gpt-oss-120b",
     badgeClass: "bg-orange-100 text-orange-800",
-    why: "Single batched call on the full review set to discard non-actionable feedbacks. Cerebras' wafer-scale inference (~2100 tok/s) keeps this cheap step near-instant. This model is overkill for a binary filter — but we take advantage of its generous 1M tokens/day free quota.",
+    why: "Single batched call on the full review set to discard non-actionable feedbacks. Cerebras gpt-oss-120b is called first, and Gemini is only the fallback, so this binary filter does not spend Gemini's daily requests. The 1M tokens/day free quota keeps the step cheap.",
   },
   {
     agent: "Iris",
     emoji: "🔬",
     badge: "Gemini 3.1 Flash Lite",
     badgeClass: "bg-indigo-100 text-indigo-800",
-    why: "The heaviest step: 4 parallel chunks of structured JSON classification with self-review. Gemini 3.1 Flash Lite's 500 RPD (vs 20 on 2.5) and 250K TPM absorb the per-run fan-out. If Gemini is down, Iris falls back first to Groq · Qwen 3.8 27B in instruct mode (no chain-of-thought), which keeps the JSON self-review intact.",
+    why: "The judgment step: cut a verbatim excerpt, name the shippable action, and refuse when the text does not support one. Gemini 3.1 Flash Lite's 500 RPD and 250K TPM absorb that fan-out. If Gemini is down, Iris falls back first to Groq · Qwen 3.8 27B in instruct mode, which keeps the JSON intact. Cerebras stays off this step so its fast quota remains on the filter and the grouping.",
   },
   {
     agent: "Echo",
     emoji: "🗂️",
     badge: "Cerebras · gpt-oss-120b",
     badgeClass: "bg-orange-100 text-orange-800",
-    why: "LLM clustering over summaries — small, semantically rich input. gpt-oss-120b's reasoning is more than enough for coherent grouping, and Cerebras' 1M tokens/day headroom means clustering never becomes the bottleneck on repeated runs.",
+    why: "Merges action titles Iris already wrote. The input is a short list of names, so gpt-oss-120b is called first and this step does not spend Gemini's daily requests. Cerebras' 1M tokens/day headroom keeps repeated runs cheap.",
   },
   {
     agent: "Nova",
@@ -275,15 +275,15 @@ export default function AboutPage() {
               <div className="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-2">Phase 1 — Classify</div>
               <div className="text-sm font-semibold text-gray-900 mb-2">First pass</div>
               <p className="text-xs text-gray-500 leading-relaxed">
-                For each feedback: assign a category and a short summary.
+                For each kept review, keep only the sentences that carry one shippable action and name that action. If the text does not support a name, set the excerpt aside. One review can yield several elements. Then assign a category.
               </p>
             </div>
             <div className="rounded-xl border border-gray-200 bg-white p-4">
               <div className="text-xs font-bold uppercase tracking-wider text-emerald-500 mb-2">Phase 2 — Self-review</div>
               <div className="text-sm font-semibold text-gray-900 mb-2">Critique & correct</div>
               <p className="text-xs text-gray-500 leading-relaxed">
-                Iris reviews its own decisions — checks for inconsistencies across similar feedbacks,
-                corrects a mislabeled category, and logs every change made.
+                Iris reviews its own decisions — checks for inconsistencies across similar elements,
+                splits an excerpt that still mixes two actions, drops a vague action name, corrects a mislabeled category, and logs every category change.
               </p>
             </div>
           </div>

@@ -36,8 +36,8 @@ function JiraButton({ card }: { card: UserStoryCard }) {
   const [nextStep, setNextStep] = useState(card.next_step ?? "");
   const [riceScore, setRiceScore] = useState<number>(card.rice?.score ?? 0);
   const [criteria, setCriteria] = useState<string[]>(card.acceptance_criteria ?? []);
-  const [feedbacks, setFeedbacks] = useState<string[]>(
-    (card.feedbacks ?? []).map((f) => (typeof f === "string" ? f : f.text))
+  const [feedbacks, setFeedbacks] = useState<SprintFeedback[]>(
+    (card.feedbacks ?? []).map((f) => (typeof f === "string" ? { text: f } : f))
   );
 
   function openModal() {
@@ -51,7 +51,7 @@ function JiraButton({ card }: { card: UserStoryCard }) {
     setNextStep(card.next_step ?? "");
     setRiceScore(card.rice?.score ?? 0);
     setCriteria(card.acceptance_criteria ?? []);
-    setFeedbacks((card.feedbacks ?? []).map((f) => (typeof f === "string" ? f : f.text)));
+    setFeedbacks((card.feedbacks ?? []).map((f) => (typeof f === "string" ? { text: f } : f)));
     setError(null);
     setShowModal(true);
   }
@@ -69,7 +69,13 @@ function JiraButton({ card }: { card: UserStoryCard }) {
       success_metric: successMetric || undefined,
       next_step: nextStep || undefined,
       acceptance_criteria: criteria.filter(Boolean),
-      feedbacks: feedbacks.filter(Boolean).map((t) => ({ text: t })),
+      feedbacks: feedbacks
+        .filter((f) => f.text.trim())
+        .map((f) => ({
+          text: f.text,
+          ...(f.source_id != null ? { source_id: f.source_id } : {}),
+          ...(f.translation ? { translation: f.translation } : {}),
+        })),
       rice: card.rice ? { ...card.rice, score: riceScore } : undefined,
     };
     try {
@@ -206,14 +212,14 @@ function JiraButton({ card }: { card: UserStoryCard }) {
                 <div className="space-y-1.5">
                   {feedbacks.map((fb, i) => (
                     <div key={i} className="flex gap-2">
-                      <input type="text" value={fb}
-                        onChange={(e) => setFeedbacks(feedbacks.map((f, j) => j === i ? e.target.value : f))}
+                      <input type="text" value={fb.text}
+                        onChange={(e) => setFeedbacks(feedbacks.map((f, j) => j === i ? { ...f, text: e.target.value } : f))}
                         className={inputCls} />
                       <button onClick={() => setFeedbacks(feedbacks.filter((_, j) => j !== i))}
                         className="text-gray-300 hover:text-red-400 text-lg leading-none shrink-0">×</button>
                     </div>
                   ))}
-                  <button onClick={() => setFeedbacks([...feedbacks, ""])}
+                  <button onClick={() => setFeedbacks([...feedbacks, { text: "" }])}
                     className="text-xs text-blue-500 hover:text-blue-700">+ Add feedback</button>
                 </div>
               </Field>
@@ -270,7 +276,7 @@ function RiceBar({ rice }: { rice: RiceScore }) {
       <div className="bg-gray-50 rounded-lg px-2 py-2">
         <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Reach</p>
         <p className="text-lg font-bold text-gray-800 leading-tight">{rice.reach}</p>
-        <p className="text-xs text-gray-400">feedbacks</p>
+        <p className="text-xs text-gray-400">excerpts</p>
       </div>
       {/* Impact */}
       <div className="bg-gray-50 rounded-lg px-2 py-2">
@@ -395,7 +401,10 @@ export default function UserStoryCards({ cards }: { cards: UserStoryCard[] }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-900">Sprint cards · sorted by RICE score</h2>
+        <h2 className="text-sm font-semibold text-gray-900">
+          {sorted.length} sprint {sorted.length === 1 ? "card" : "cards"}
+          <span className="font-normal text-gray-400"> · sorted by RICE score</span>
+        </h2>
         <a
           href="https://triagemvp.atlassian.net/jira/software/projects/SCRUM/boards"
           target="_blank"
@@ -451,6 +460,9 @@ export default function UserStoryCards({ cards }: { cards: UserStoryCard[] }) {
                           <li key={j} className="flex gap-2">
                             <span className="text-gray-300 select-none shrink-0 mt-0.5">›</span>
                             <div>
+                              {fb.source_id != null && (
+                                <span className="text-xs text-gray-400 not-italic mr-1.5">#{fb.source_id}</span>
+                              )}
                               <span className="text-sm text-gray-500 italic">"{fb.text}"</span>
                               {fb.translation && fb.translation.trim().toLowerCase() !== fb.text.trim().toLowerCase() && (
                                 <p className="text-xs text-gray-400 mt-0.5 not-italic">

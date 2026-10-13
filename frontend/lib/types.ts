@@ -3,7 +3,10 @@ export type Store = "googleplay" | "appstore";
 export interface FeedbackItem {
   id: number;
   original: string;
+  excerpt?: string;
+  source_id?: number;
   summary?: string;
+  action?: string;
   category?: string;
   priority?: "High" | "Medium" | "Low";
   priority_reason?: string;
@@ -25,6 +28,7 @@ export type ActionType = "bug" | "performance" | "feature" | "ux" | "pricing" | 
 export interface SprintFeedback {
   text: string;
   translation?: string;
+  source_id?: number;
 }
 
 export type RiceImpact = 0.25 | 0.5 | 1 | 2 | 3;
@@ -55,8 +59,16 @@ export interface UserStoryCard {
   next_step?: string;
 }
 
+export interface UnclearElement {
+  source_id: number;
+  excerpt: string;
+  original?: string;
+  reason?: string;
+}
+
 export interface AnalysisResult {
   items: FeedbackItem[];
+  unclear_items?: UnclearElement[];
   corrections: Correction[];
   used_fallback: boolean;
   iris_fallback_provider?: string | null;

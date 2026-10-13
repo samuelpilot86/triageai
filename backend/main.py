@@ -119,23 +119,29 @@ async def analysis_stream(feedbacks: list[str], app_name: str | None = None) -> 
     # 1. Sift
     yield sse_event("status", {"step": "sift", "message": f"Filtering {len(feedbacks)} feedbacks…"})
     try:
-        actionable_texts, non_actionable_texts = await agent.sift_feedbacks(feedbacks)
+        actionable, non_actionable_texts = await agent.sift_feedbacks(feedbacks)
     except Exception as e:
         yield sse_event("error", {"message": str(e)})
         return
-    yield sse_event("sifted", {"actionable_count": len(actionable_texts), "non_actionable_count": len(non_actionable_texts), "non_actionable": non_actionable_texts})
+    yield sse_event("sifted", {"actionable_count": len(actionable), "non_actionable_count": len(non_actionable_texts), "non_actionable": non_actionable_texts})
 
-    # 2. Iris — only on actionable
-    yield sse_event("status", {"step": "categorization", "message": f"Analyzing {len(actionable_texts)} feedbacks…"})
+    # 2. Iris — split kept reviews into verbatim elements, then label them
+    yield sse_event("status", {"step": "categorization", "message": f"Splitting {len(actionable)} feedbacks…"})
     try:
-        items, corrections, iris_fallback_provider = await agent.categorize_and_validate(actionable_texts)
+        items, unclear, corrections, iris_fallback_provider = await agent.categorize_and_validate(actionable)
     except Exception as e:
         yield sse_event("error", {"message": str(e)})
         return
-    yield sse_event("categorization", {"items": items, "corrections": corrections, "used_fallback": iris_fallback_provider is not None, "fallback_provider": iris_fallback_provider})
+    yield sse_event("categorization", {
+        "items": items,
+        "unclear": unclear,
+        "corrections": corrections,
+        "used_fallback": iris_fallback_provider is not None,
+        "fallback_provider": iris_fallback_provider,
+    })
 
     # 3. Echo — LLM clustering
-    yield sse_event("status", {"step": "clustering", "message": "Grouping feedbacks by topic…"})
+    yield sse_event("status", {"step": "clustering", "message": "Grouping elements by action…"})
     try:
         clusters = await agent.cluster_with_llm(items)
     except Exception as e:
@@ -145,7 +151,7 @@ async def analysis_stream(feedbacks: list[str], app_name: str | None = None) -> 
     yield sse_event("clustered", {"count": len(clusters), "items": items})
 
     # Penn (executive report) is parked in parked_report.py.
-    # One card per cluster; the cluster label is the action title until grouping writes its own.
+    # One card per cluster. The cluster label is the action. Quotes on the card are excerpts.
     actions = [c.get("cluster_label") or "Untitled" for c in clusters]
 
     # 4. Nova
@@ -368,7 +374,14 @@ async def create_jira_issue(payload: dict):
         desc_content.append({"type": "paragraph", "content": [{"type": "text", "text": rice_text, "marks": [{"type": "em"}]}]})
 
     if payload.get("feedbacks"):
-        fb_items = [{"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": f['text'] if isinstance(f, dict) else f}]}]} for f in payload["feedbacks"]]
+        def _support_line(f) -> str:
+            if isinstance(f, dict):
+                text = f.get("text") or ""
+                source_id = f.get("source_id")
+                return f"#{source_id}: {text}" if source_id else text
+            return str(f)
+
+        fb_items = [{"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": _support_line(f)}]}]} for f in payload["feedbacks"]]
         desc_content += [
             {"type": "paragraph", "content": [{"type": "text", "text": "Supporting feedbacks", "marks": [{"type": "strong"}]}]},
             {"type": "bulletList", "content": fb_items},

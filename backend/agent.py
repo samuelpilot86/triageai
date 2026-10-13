@@ -2,11 +2,15 @@
 agent.py — Core logic of the product feedback triage agent.
 
 Model routing:
-  - Sift  (pre-filter)     : Cerebras / gpt-oss-120b — fast MoE, minimal output, falls back to Gemini.
-  - Iris  (categorization) : Gemini 3.1 Flash Lite — 250K TPM absorbs parallel chunks, 500 RPD.
-                             Falls back to Groq Qwen 3.8 27B if Gemini unavailable.
-  - Echo  (clustering)     : Cerebras / gpt-oss-120b — structured JSON, small output, fast.
-  - Nova  (sprint cards)   : Gemini 3.1 Flash Lite — one RICE card per cluster.
+  - Sift  (pre-filter)     : Cerebras / gpt-oss-120b first — binary filter, tiny output.
+                             Falls back to Gemini 3.1 Flash Lite.
+  - Iris  (split + action) : Gemini 3.1 Flash Lite — verbatim excerpts, a shippable action name,
+                             a category, and a refusal when the action cannot be named.
+                             Falls back to Groq Qwen 3.8 27B in instruct mode.
+  - Echo  (clustering)     : Cerebras / gpt-oss-120b first — merges action names already written by Iris.
+                             Falls back to Gemini.
+  - Nova  (sprint cards)   : Gemini 3.1 Flash Lite — one RICE card per action.
+                             Falls back to Cerebras GLM 4.7.
   The executive report (Penn) lives in parked_report.py and is not called.
 """
 
@@ -15,6 +19,8 @@ import json
 import re
 from google import genai
 from groq import AsyncGroq
+
+from excerpts import accept_elements, settle_clusters
 
 try:
     from openai import AsyncOpenAI as _AsyncOpenAI
@@ -126,14 +132,13 @@ CEREBRAS_NARRATIVE_MODEL = "zai-glm-4.7"  # Nova — GLM 4.7 (Zhipu/Z.ai); repla
 FALLBACK_MODEL = "qwen/qwen3.8-27b"  # Groq last-resort; successor to qwen-3.6-27b (decommissioned 14 Sep 2026)
 FALLBACK_MODEL_MAX_TOKENS = 16_384  # Groq max completion tokens for Qwen 3.8 27B
 
-# Output token budget per feedback (JSON fields: original, summary, category
-# + corrections) + fixed overhead
-_TOKENS_PER_FEEDBACK = 250
+# Output token budget per kept review. A review can yield several excerpts.
+_TOKENS_PER_FEEDBACK = 400
 _TOKENS_OVERHEAD = 512
 
 # Groq free tier: 12 000 TPM (input + output combined).
-# At ~1 500 tokens of input overhead + 250 per feedback output,
-# max safe feedbacks per call = floor((12000 - 1500) / 250) = 42.
+# Chunk size stays at 30 so a kept review can yield more than one excerpt
+# without blowing the output budget on the fallback model.
 GROQ_CHUNK_SIZE = 30
 SIFT_CHUNK_SIZE = 25   # Sift parallelization: 25 feedbacks/chunk → 4 parallel calls on 100 feedbacks
 
@@ -225,45 +230,63 @@ class FeedbackTriageAgent:
     # Central LLM call with fallback
     # ------------------------------------------------------------------
 
-    def _build_categorization_prompt(self, feedbacks: list[str]) -> str:
-        """Builds the categorization+validation prompt for a list of feedbacks."""
-        feedbacks_numbered = "\n".join(
-            [f"{i + 1}. {f}" for i, f in enumerate(feedbacks)]
-        )
+    def _build_categorization_prompt(self, feedbacks: list[tuple[int, str]]) -> str:
+        """Ask Iris for one or more verbatim excerpts per kept review."""
+        feedbacks_numbered = "\n".join(f"{source_id}. {text}" for source_id, text in feedbacks)
         categories_str = ", ".join(CATEGORIES)
         return f"""You are an expert product feedback analyst. Work in two phases.
 
 FEEDBACKS TO ANALYZE:
 {feedbacks_numbered}
 
-═══ PHASE 1 — CATEGORIZATION ═══
-For each feedback, determine:
-- id          : item number (integer, starts at 1)
-- original    : exact original text
-- summary     : concise summary in 6 words or fewer
-- category    : ONE of: {categories_str}
+═══ PHASE 1 — SPLIT INTO ACTIONABLE ELEMENTS ═══
+An actionable element is one shippable product action. It is distinct from the feedback it comes from.
+
+For each feedback, return one or more elements:
+- One element when the feedback contains a single shippable action. The excerpt is only the sentences that carry that action. Leave out praise, insults, and filler.
+- Several elements when the feedback contains two or more distinct shippable actions, such as a bug and a separate feature request, or two different bugs. Each excerpt contains only the sentences for its own action.
+- Do not create an element for a sentence that has no product action.
+
+Each element:
+- id        : integer, starts at 1, unique in this response
+- source_id : the feedback number printed above. Copy that number.
+- excerpt   : an exact contiguous copy of those sentences. Do not paraphrase, translate, shorten with an ellipsis, or add words. The excerpt must appear verbatim in that feedback.
+- summary   : what this element asks for, 6 words or fewer
+- action    : the shippable change, as a ticket title, 8 words or fewer. Name only what the excerpt itself says. Do not guess. Never use Other, Misc, Bugs, or a theme.
+- category  : ONE of: {categories_str}
+
+If a span suggests a wish but you cannot name the action without guessing, do not put it in elements. Put it in unclear.
 
 ═══ PHASE 2 — SELF-CORRECTION ═══
 Review your own decisions critically:
 - Is the category truly the most accurate one?
-- Are there inconsistencies across similar feedbacks?
-Apply corrections directly in the final feedbacks output.
-
-IMPORTANT: Return ALL feedbacks in the array, including non-actionable ones. Do NOT skip or omit any feedback.
+- Are there inconsistencies across similar elements?
+- Does any excerpt still contain a second shippable action? If it does, replace that element with two elements in the array. Each new excerpt must still be a verbatim span of the same feedback.
+- Is the action name a change a team could ship? If it is vague, or if naming it required a guess, move that element to unclear and remove it from elements.
+Apply category corrections directly in the elements array, and log them.
 
 Return ONLY valid JSON, no markdown, no surrounding text:
 {{
-  "feedbacks": [
+  "elements": [
     {{
       "id": 1,
-      "original": "...",
+      "source_id": 1,
+      "excerpt": "exact sentences copied from that feedback",
       "summary": "...",
+      "action": "shippable change in a few words",
       "category": "..."
+    }}
+  ],
+  "unclear": [
+    {{
+      "source_id": 2,
+      "excerpt": "exact sentences that do not name an action",
+      "reason": "why no ticket can be named, 10 words max"
     }}
   ],
   "corrections": [
     {{
-      "id": <corrected feedback id>,
+      "id": <element id>,
       "field": "category",
       "old_value": "initial value",
       "new_value": "corrected value",
@@ -344,53 +367,62 @@ IMPORTANT RULES FOR CORRECTIONS:
         )
 
     async def _categorize_chunked(
-        self, feedbacks: list[str], chunk_size: int
-    ) -> tuple[list[dict], list[dict], str | None]:
+        self, feedbacks: list[tuple[int, str]], chunk_size: int
+    ) -> tuple[list[dict], list[dict], list[dict], str | None]:
         """
-        Processes feedbacks in chunks (Groq TPM limit = 25/chunk), all chunks in parallel.
-        Returns (items, corrections, fallback_provider) — None if Gemini succeeded for all chunks.
+        Splits kept reviews into verbatim elements, in parallel chunks.
+        Returns (elements, unclear, corrections, fallback_provider).
+        fallback_provider is None when Gemini handled every chunk.
         """
         import asyncio as _asyncio
 
         chunks = [feedbacks[i: i + chunk_size] for i in range(0, len(feedbacks), chunk_size)]
-        offsets = [i * chunk_size for i in range(len(chunks))]
 
-        async def process_chunk(chunk: list[str], offset: int) -> tuple[list[dict], list[dict], str | None]:
+        async def process_chunk(chunk: list[tuple[int, str]]) -> tuple[list[dict], list[dict], list[dict], str | None]:
             prompt = self._build_categorization_prompt(chunk)
             text, chunk_provider = await self._call_llm_iris(prompt, n_feedbacks=len(chunk))
             data = self._parse_json_response(text)
-            chunk_items = data.get("feedbacks", [])
-            chunk_corrections = [
-                c for c in data.get("corrections", [])
-                if c.get("old_value") != c.get("new_value")
-            ]
-            for item in chunk_items:
-                item["id"] = offset + item["id"]
-            for correction in chunk_corrections:
-                correction["id"] = offset + correction["id"]
-            return chunk_items, chunk_corrections, chunk_provider
+            elements, unclear, corrections = accept_elements(chunk, data, set(CATEGORIES))
+            return elements, unclear, corrections, chunk_provider
 
-        results = await _asyncio.gather(*[process_chunk(chunk, offset) for chunk, offset in zip(chunks, offsets)])
+        results = await _asyncio.gather(*[process_chunk(chunk) for chunk in chunks])
 
         all_items: list[dict] = []
+        all_unclear: list[dict] = []
         all_corrections: list[dict] = []
         fallback_provider: str | None = None
-        for chunk_items, chunk_corrections, chunk_provider in results:
-            all_items.extend(chunk_items)
-            all_corrections.extend(chunk_corrections)
+        next_id = 1
+        for chunk_items, chunk_unclear, chunk_corrections, chunk_provider in results:
+            local_to_global: dict[int, int] = {}
+            for item in chunk_items:
+                local_id = item.pop("_local_id", None)
+                item["id"] = next_id
+                if isinstance(local_id, int) and local_id not in local_to_global:
+                    local_to_global[local_id] = next_id
+                next_id += 1
+                all_items.append(item)
+            all_unclear.extend(chunk_unclear)
+            for correction in chunk_corrections:
+                local_id = correction.pop("_local_id", None)
+                global_id = local_to_global.get(local_id)
+                if global_id is None:
+                    continue
+                correction["id"] = global_id
+                all_corrections.append(correction)
             if chunk_provider is not None and fallback_provider is None:
                 fallback_provider = chunk_provider
 
-        return all_items, all_corrections, fallback_provider
+        return all_items, all_unclear, all_corrections, fallback_provider
 
     async def _call_llm(
-        self, prompt: str, max_tokens: int = 2500, cerebras_model: str = CEREBRAS_NARRATIVE_MODEL
-    ) -> tuple[str, bool]:
+        self, prompt: str, max_tokens: int = 2500, cerebras_model: str = CEREBRAS_NARRATIVE_MODEL,
+        prefer_cerebras: bool = False,
+    ) -> tuple[str, str | None]:
         """
-        General call chain: Gemini 3.1 Flash Lite → Cerebras (GLM 4.7) → Mistral → OpenRouter → Groq.
-        Gemini is primary for Nova (Cerebras GLM 4.7 access unreliable on free tier).
-        Returns (response_text, fallback_provider). fallback_provider is None if Gemini succeeded,
-        or a string like "Cerebras", "Groq", etc. identifying which fallback was used.
+        Nova chain: Gemini 3.1 Flash Lite → Cerebras → Mistral → OpenRouter → Groq.
+        Sift and Echo pass prefer_cerebras=True so gpt-oss-120b runs first and Gemini's
+        daily quota stays on Iris and Nova. GLM 4.7 is only the Nova fallback.
+        Returns (response_text, fallback_provider). None means the primary model succeeded.
         """
         import asyncio as _asyncio
 
@@ -403,8 +435,16 @@ IMPORTANT RULES FOR CORRECTIONS:
         fallback_errors: list[str] = []
         groq_max_tokens = min(FALLBACK_MODEL_MAX_TOKENS, max_tokens)
         nemotron_max_tokens = min(4096, max_tokens)
+        cerebras_tried = False
 
-        # 1. Gemini 3.1 Flash Lite — primary for Nova (reliable free tier, 500 RPD)
+        if prefer_cerebras and self.cerebras_client:
+            cerebras_tried = True
+            try:
+                return await self._call_cerebras(cerebras_model, prompt, max_tokens), None
+            except Exception as e:
+                fallback_errors.append(f"Cerebras: {e}")
+
+        # Gemini 3.1 Flash Lite — primary for Nova, fallback for Sift and Echo.
         last_error = None
         for attempt in range(2):  # 1 retry on transient 503s, no retry on quota errors
             try:
@@ -412,7 +452,8 @@ IMPORTANT RULES FOR CORRECTIONS:
                     model=IRIS_MODEL,
                     contents=prompt,
                 )
-                return self._extract_text(response), None
+                text = self._extract_text(response)
+                return text, ("Gemini" if prefer_cerebras else None)
             except Exception as e:
                 error_str = str(e)
                 last_error = e
@@ -427,8 +468,8 @@ IMPORTANT RULES FOR CORRECTIONS:
                     raise
         fallback_errors.append(f"Gemini: {str(last_error)[:100] if last_error else 'unknown'}")
 
-        # 2. Cerebras GLM 4.7 — fast when available (100 RPD free tier)
-        if self.cerebras_client:
+        # Cerebras — Nova fallback (GLM 4.7). Skipped when Sift or Echo already tried it.
+        if self.cerebras_client and not cerebras_tried:
             try:
                 return await self._call_cerebras(cerebras_model, prompt, max_tokens), "Cerebras"
             except Exception as e:
@@ -481,24 +522,24 @@ IMPORTANT RULES FOR CORRECTIONS:
     # Sift — filter actionable feedbacks (single batched LLM call)
     # ------------------------------------------------------------------
 
-    async def sift_feedbacks(self, feedbacks: list[str]) -> tuple[list[str], list[str]]:
+    async def sift_feedbacks(self, feedbacks: list[str]) -> tuple[list[tuple[int, str]], list[str]]:
         """
-        Filters feedbacks into actionable and non-actionable.
-        Splits into SIFT_CHUNK_SIZE chunks and runs them in parallel on Cerebras.
-        Returns (actionable_texts, non_actionable_texts).
+        Filters whole reviews into actionable and non-actionable.
+        Returns (actionable, non_actionable_texts). Each actionable entry is
+        (source_id, text), with source_id the 1-based index in the input list.
         """
         chunks = [feedbacks[i:i + SIFT_CHUNK_SIZE] for i in range(0, len(feedbacks), SIFT_CHUNK_SIZE)]
         tasks = [self._sift_chunk(chunk, global_offset=i * SIFT_CHUNK_SIZE) for i, chunk in enumerate(chunks)]
         chunk_results = await asyncio.gather(*tasks)
 
-        actionable: list[str] = []
+        actionable: list[tuple[int, str]] = []
         non_actionable: list[str] = []
         for a, na in chunk_results:
             actionable.extend(a)
             non_actionable.extend(na)
         return actionable, non_actionable
 
-    async def _sift_chunk(self, chunk: list[str], global_offset: int) -> tuple[list[str], list[str]]:
+    async def _sift_chunk(self, chunk: list[str], global_offset: int) -> tuple[list[tuple[int, str]], list[str]]:
         """
         Sift a single chunk of feedbacks. IDs in the prompt are local (1-based);
         results are mapped back using global_offset.
@@ -513,10 +554,12 @@ Return ONLY valid JSON array of integers, e.g.: [1, 3, 5]"""
 
         import logging as _logging
         try:
-            text, _ = await self._call_llm(prompt, max_tokens=500, cerebras_model=CEREBRAS_STRUCTURED_MODEL)
+            text, _ = await self._call_llm(
+                prompt, max_tokens=500, cerebras_model=CEREBRAS_STRUCTURED_MODEL, prefer_cerebras=True,
+            )
         except Exception as e:
             _logging.getLogger("triage").warning("_sift_chunk(offset=%d): call failed, treating all as actionable. Error: %s", global_offset, e)
-            return chunk, []
+            return [(global_offset + i, f) for i, f in enumerate(chunk, 1)], []
 
         try:
             clean = re.sub(r"```(?:json)?\s*\n?", "", text)
@@ -525,9 +568,9 @@ Return ONLY valid JSON array of integers, e.g.: [1, 3, 5]"""
             actionable_ids = set(json.loads(m.group(0) if m else clean))
         except Exception:
             _logging.getLogger("triage").warning("_sift_chunk(offset=%d): parse failed, treating all as actionable. Raw: %s", global_offset, text[:200])
-            return chunk, []
+            return [(global_offset + i, f) for i, f in enumerate(chunk, 1)], []
 
-        actionable = [f for i, f in enumerate(chunk, 1) if i in actionable_ids]
+        actionable = [(global_offset + i, f) for i, f in enumerate(chunk, 1) if i in actionable_ids]
         non_actionable = [f for i, f in enumerate(chunk, 1) if i not in actionable_ids]
         return actionable, non_actionable
 
@@ -537,26 +580,34 @@ Return ONLY valid JSON array of integers, e.g.: [1, 3, 5]"""
 
     async def cluster_with_llm(self, items: list[dict]) -> list[dict]:
         """
-        Clusters feedback items using a single LLM call on their summaries.
-        score is the number of feedbacks in the cluster. Ticket order is RICE, on the cards.
+        Merges elements that name the same shippable action.
+        A generic label such as Other is split back into one ticket per action.
+        score is the number of elements in the cluster. Ticket order is RICE, on the cards.
         Each cluster dict: {score, cluster_label, category, items}.
         Tags each item with cluster_id and cluster_label.
         """
-        id_summary_list = "\n".join(f"{it['id']}: {it.get('summary', '')}" for it in items)
-        prompt = f"""You are a product analyst. Group these feedback summaries into thematic clusters. Each cluster must correspond to a single Jira ticket: one specific behavior, one probable root cause, one testable "done" definition. If two feedbacks describe different behaviors (even under the same general theme), put them in separate clusters. Decide the number of clusters yourself based on the data.
+        if not items:
+            return []
+        id_action_list = "\n".join(f"{it['id']}: {it.get('action', '')}" for it in items)
+        prompt = f"""You are a product analyst. Group these action names. Each line is one shippable action already named by an earlier step. Put names that refer to the same change in the same group, including a group of one. Two different changes stay apart. Use every id exactly once.
 
-FEEDBACKS (id: summary):
-{id_summary_list}
+ACTIONS (id: action):
+{id_action_list}
+
+cluster_label is the action itself, at most 8 words. Use the clearest wording already in the group.
+Never label a group Other, Misc, Uncategorized, Bugs, or any theme broader than the action.
 
 YOUR RESPONSE MUST START WITH [ AND CONTAIN ONLY A VALID JSON ARRAY. No explanation, no preamble, no markdown.
 [
   {{
-    "cluster_label": "short descriptive name (max 8 words)",
+    "cluster_label": "the action name",
     "ids": [1, 3, 7]
   }}
 ]"""
 
-        text, _ = await self._call_llm(prompt, max_tokens=2000, cerebras_model=CEREBRAS_STRUCTURED_MODEL)
+        text, _ = await self._call_llm(
+            prompt, max_tokens=2000, cerebras_model=CEREBRAS_STRUCTURED_MODEL, prefer_cerebras=True,
+        )
         try:
             # Strip <think> blocks, fences, then find the JSON array
             clean = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
@@ -574,7 +625,10 @@ YOUR RESPONSE MUST START WITH [ AND CONTAIN ONLY A VALID JSON ARRAY. No explanat
         result = []
         assigned_ids: set[int] = set()
         for raw in raw_clusters:
-            cluster_ids = [i for i in raw.get("ids", []) if i in item_by_id]
+            cluster_ids = []
+            for element_id in raw.get("ids", []):
+                if element_id in item_by_id and element_id not in assigned_ids and element_id not in cluster_ids:
+                    cluster_ids.append(element_id)
             if not cluster_ids:
                 continue
             cluster_items = [item_by_id[i] for i in cluster_ids]
@@ -589,19 +643,18 @@ YOUR RESPONSE MUST START WITH [ AND CONTAIN ONLY A VALID JSON ARRAY. No explanat
                 "items": cluster_items,
             })
 
-        # Any items not assigned by LLM go to an "Other" cluster
-        unassigned = [it for it in items if it["id"] not in assigned_ids]
-        if unassigned:
-            score = len(unassigned)
-            cats = [it.get("category", "") for it in unassigned]
-            majority_cat = max(set(cats), key=cats.count) if cats else "Other"
+        # An element the model forgot must not be glued to a different action.
+        for item in items:
+            if item["id"] in assigned_ids:
+                continue
             result.append({
-                "score": score,
-                "cluster_label": "Other",
-                "category": majority_cat,
-                "items": unassigned,
+                "score": 1,
+                "cluster_label": item.get("action") or item.get("summary") or "Untitled",
+                "category": item.get("category") or "Other",
+                "items": [item],
             })
 
+        result = settle_clusters(result)
         result.sort(key=lambda x: x["score"], reverse=True)
 
         # Tag each item with cluster_id and cluster_label
@@ -617,21 +670,22 @@ YOUR RESPONSE MUST START WITH [ AND CONTAIN ONLY A VALID JSON ARRAY. No explanat
     # ------------------------------------------------------------------
 
     async def categorize_and_validate(
-        self, feedbacks: list[str]
-    ) -> tuple[list[dict], list[dict], str | None]:
+        self, feedbacks: list[tuple[int, str]]
+    ) -> tuple[list[dict], list[dict], list[dict], str | None]:
         """
-        Categorizes feedbacks AND self-corrects.
-        Returns (final_items, corrections_list, fallback_provider) — None if Gemini handled all chunks.
+        Splits each kept review into verbatim elements and names a shippable action.
+        Elements without that name are returned as unclear and do not continue.
+        Returns (elements, unclear, corrections_list, fallback_provider).
         """
-        items, corrections, fallback_provider = await self._categorize_chunked(feedbacks, GROQ_CHUNK_SIZE)
-        return items, corrections, fallback_provider
+        return await self._categorize_chunked(feedbacks, GROQ_CHUNK_SIZE)
 
     async def generate_user_stories(
         self, clusters: list[dict], actions: list[str]
     ) -> tuple[list[dict], str | None]:
         """
         One sprint card per cluster. The action title is the cluster label.
-        Every feedback in the cluster is kept on the card.
+        Each supporting quote is the element's excerpt, not the whole review.
+        Reach is the number of elements in the cluster.
         Cards are sorted by RICE score descending.
         Returns (cards, fallback_provider).
         """
@@ -666,27 +720,38 @@ YOUR RESPONSE MUST START WITH [ AND CONTAIN ONLY A VALID JSON ARRAY. No explanat
                     by_norm[_norm(text)] = tr
             rebuilt = []
             for i, it in enumerate(items):
-                original = it.get("original") or ""
-                entry: dict = {"text": original}
+                excerpt = it.get("excerpt") or ""
+                entry: dict = {"text": excerpt}
+                if it.get("source_id") is not None:
+                    entry["source_id"] = it["source_id"]
                 tr = None
                 if by_index:
                     raw = model_fbs[i].get("translation")
                     quoted = model_fbs[i].get("text") or ""
-                    if raw and _norm(raw) != _norm(original) and _norm(raw) != _norm(quoted):
+                    if raw and _norm(raw) != _norm(excerpt) and _norm(raw) != _norm(quoted):
                         tr = raw
                 if tr is None:
-                    tr = by_norm.get(_norm(original))
+                    tr = by_norm.get(_norm(excerpt))
                 if tr:
                     entry["translation"] = tr
                 rebuilt.append(entry)
             card["feedbacks"] = rebuilt
             card["action"] = action
+            rice = card.get("rice")
+            if not isinstance(rice, dict):
+                rice = {}
+                card["rice"] = rice
+            rice["reach"] = len(items)
             return card
 
         async def one(index: int, action: str) -> tuple[dict | None, str | None]:
             items = clusters[index]["items"] if index < len(clusters) else []
             feedbacks = [
-                {"original": it.get("original", ""), "summary": it.get("summary", "")}
+                {
+                    "source_id": it.get("source_id"),
+                    "excerpt": it.get("excerpt", ""),
+                    "summary": it.get("summary", ""),
+                }
                 for it in items
             ]
             prompt = f"""You are a senior Product Manager writing one actionable sprint card.
@@ -694,7 +759,7 @@ YOUR RESPONSE MUST START WITH [ AND CONTAIN ONLY A VALID JSON ARRAY. No explanat
 ACTION (copy this title verbatim into the "action" field):
 {action}
 
-USER FEEDBACKS for this action, in order. There are {len(feedbacks)}. Include every one.
+ACTIONABLE EXCERPTS for this action, in order. There are {len(feedbacks)}. Each excerpt is already only the part of a review that asks for this action. Include every one. Do not quote the rest of the review.
 {json.dumps(feedbacks, ensure_ascii=False, indent=2)}
 
 Follow these steps:
@@ -702,13 +767,14 @@ Follow these steps:
 STEP 1 — Detect action_type: "bug" | "performance" | "feature" | "ux" | "pricing" | "ai_quality" | "other"
   Use "ai_quality" when the action addresses the quality, tone, accuracy, or relevance of AI-generated responses.
 
-STEP 2 — Copy EVERY feedback above into "feedbacks", in the same order, verbatim in "text".
-Do not drop, merge, or shorten a feedback.
-For each quote, detect its language. If it is NOT English, add a "translation" field
+STEP 2 — Copy EVERY excerpt above into "feedbacks", in the same order.
+"text" is the excerpt, verbatim. "source_id" is the integer given with that excerpt. Copy both.
+Do not drop, merge, or shorten an excerpt, and do not add sentences from the rest of the review.
+For each excerpt, detect its language. If it is NOT English, add a "translation" field
 with a concise English translation. If it IS English, omit the "translation" field entirely.
 
 STEP 3 — Estimate RICE:
-- reach: integer count of feedbacks in this action's cluster that directly address this issue
+- reach: {len(feedbacks)}. This count is fixed. Copy it. Do not estimate a different number.
 - impact: how much this hurts each person who hits it. Use ONLY one of these values (Intercom's RICE scale):
   * 3    = massive (blocking, or they leave)
   * 2    = high
@@ -734,8 +800,8 @@ Return ONLY one valid JSON object, no markdown, no surrounding text:
   "action": "exact action title verbatim",
   "action_type": "bug",
   "feedbacks": [
-    {{"text": "verbatim quote in original language", "translation": "English translation"}},
-    {{"text": "verbatim English quote"}}
+    {{"text": "verbatim excerpt in original language", "source_id": 1, "translation": "English translation"}},
+    {{"text": "verbatim English excerpt", "source_id": 2}}
   ],
   "rice": {{"reach": 12, "impact": 3, "confidence": 0.8, "effort_label": "M", "effort": 2, "score": 144}},
   "what_breaks": "Concise description of what fails and when",
@@ -747,8 +813,9 @@ Return ONLY one valid JSON object, no markdown, no surrounding text:
             if card is None:
                 print(f"[generate_user_stories] parse error for {action!r}\nRaw output: {text[:500]}")
                 return None, provider
+            card = _attach_feedbacks(card, items, action)
             _normalize_rice(card)
-            return _attach_feedbacks(card, items, action), provider
+            return card, provider
 
         results = await asyncio.gather(
             *[one(i, action) for i, action in enumerate(actions)],

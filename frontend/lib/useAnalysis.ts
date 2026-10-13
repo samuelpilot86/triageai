@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { AnalysisStep, AnalysisResult, FeedbackItem, Correction, Store, AppEntry, UserStoryCard } from "./types";
+import { AnalysisStep, AnalysisResult, FeedbackItem, Correction, Store, AppEntry, UserStoryCard, UnclearElement } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7860";
 
@@ -131,6 +131,7 @@ export function useAnalysis() {
   const reportRef = useRef<{ text: string; fallback: boolean; fallback_provider?: string | null } | null>(null);
   const userStoryCardsRef = useRef<UserStoryCard[]>([]);
   const nonActionableItemsRef = useRef<string[]>([]);
+  const unclearItemsRef = useRef<UnclearElement[]>([]);
   const actionableCountRef = useRef<number | null>(null);
   const siftStartRef = useRef<number | null>(null);
   const siftNRef = useRef<number>(0);
@@ -152,6 +153,7 @@ export function useAnalysis() {
     reportRef.current = null;
     userStoryCardsRef.current = [];
     nonActionableItemsRef.current = [];
+    unclearItemsRef.current = [];
     actionableCountRef.current = null;
     siftStartRef.current = null;
     siftNRef.current = 0;
@@ -176,6 +178,7 @@ export function useAnalysis() {
     cards_fallback_provider: cardsProviderRef.current,
     user_story_cards: userStoryCardsRef.current,
     non_actionable_items: nonActionableItemsRef.current,
+    unclear_items: unclearItemsRef.current,
   }), []);
 
   const handleEvents = useCallback((event: string, data: unknown) => {
@@ -265,6 +268,7 @@ export function useAnalysis() {
     } else if (event === "categorization") {
       const fallback = (d.used_fallback as boolean) ?? false;
       setPartialItems(d.items as FeedbackItem[]);
+      unclearItemsRef.current = (d.unclear as UnclearElement[]) ?? [];
       correctionsRef.current = (d.corrections as Correction[]) ?? [];
       usedFallbackRef.current = fallback;
       irisFallbackProviderRef.current = (d.fallback_provider as string | null) ?? null;
@@ -414,5 +418,5 @@ export function useAnalysis() {
     if (lastCallRef.current) return lastCallRef.current();
   }, []);
 
-  return { step, partialItems, appName, nonActionableItemsRef, actionableCountRef, allEstimatesRef, analyzeText, analyzeCsv, analyzeStore, reset, retry };
+  return { step, partialItems, appName, nonActionableItemsRef, unclearItemsRef, actionableCountRef, allEstimatesRef, analyzeText, analyzeCsv, analyzeStore, reset, retry };
 }

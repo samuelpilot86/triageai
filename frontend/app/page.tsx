@@ -13,7 +13,7 @@ import AppFooter from "@/components/AppFooter";
 
 
 export default function Home() {
-  const { step, partialItems, appName, nonActionableItemsRef, actionableCountRef, allEstimatesRef, analyzeText, analyzeCsv, analyzeStore, reset, retry } = useAnalysis();
+  const { step, partialItems, appName, nonActionableItemsRef, unclearItemsRef, actionableCountRef, allEstimatesRef, analyzeText, analyzeCsv, analyzeStore, reset, retry } = useAnalysis();
   const resultsRef = useRef<HTMLDivElement>(null);
   const pipelineMetaRef = useRef<{ nFeedbacks?: number; clusterCount?: number; siftedCount?: number }>({});
   const sourceRef = useRef<PipelineSource | undefined>(undefined);
@@ -186,15 +186,16 @@ disabled={isRunning}
           )}
 
           {/* 4 — Actionable feedbacks */}
-          {showResults && (partialItems.length > 0 || skeletonCount > 0 || (step.type === "done" && (step.result.non_actionable_items?.length ?? 0) > 0)) && (
+          {showResults && (partialItems.length > 0 || skeletonCount > 0 || (step.type === "done" && ((step.result.non_actionable_items?.length ?? 0) > 0 || (step.result.unclear_items?.length ?? 0) > 0))) && (
             <section className="space-y-2">
               <h2 className="text-sm font-medium text-gray-500">
-                Actionable feedbacks
+                Actionable elements
               </h2>
               <FeedbackTable
                 items={partialItems}
                 skeletonCount={skeletonCount}
                 nonActionableItems={step.type === "done" ? (step.result.non_actionable_items ?? []) : nonActionableItemsRef.current}
+                unclearItems={step.type === "done" ? (step.result.unclear_items ?? []) : unclearItemsRef.current}
               />
             </section>
           )}
